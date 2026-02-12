@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from ISLP.smoothing_spline import SmoothingSpline, compute_edf_reinsch
+from smoothing_spline.smoothing_spline import SmoothingSpline, compute_edf_reinsch
 from scipy.interpolate import make_smoothing_spline
 
 
