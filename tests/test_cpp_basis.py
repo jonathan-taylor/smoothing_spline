@@ -1,0 +1,83 @@
+import numpy as np
+import pytest
+from scipy.interpolate import CubicSpline
+try:
+    from smoothing_spline._spline_extension import compute_natural_spline_basis
+    CPP_AVAILABLE = True
+except ImportError:
+    CPP_AVAILABLE = False
+
+@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
+def test_cpp_basis_matches_scipy():
+    assert CPP_AVAILABLE
+    rng = np.random.default_rng(42)
+    # Generate random data
+    x = np.sort(rng.uniform(0, 10, 100))
+    knots = np.sort(rng.uniform(0, 10, 10)) # 10 knots
+
+    # Scipy Basis
+    identity = np.eye(len(knots))
+    cs = CubicSpline(knots, identity, bc_type='natural')
+    
+    expected_N = cs(x)
+    cpp_N = compute_natural_spline_basis(x, knots, extrapolate_linear=False)
+    
+    np.testing.assert_allclose(cpp_N, expected_N, atol=1e-8, rtol=1e-8)
+
+@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
+def test_cpp_basis_linear_extrapolation():
+    # Test linear extrapolation behavior
+    knots = np.array([0., 1., 2.])
+    x = np.array([-1.0, 3.0]) 
+    
+    # 1. Check linearity manually
+    # For linear extrapolation, the second derivative should be exactly 0
+    # We can check values against a linear fit from the boundary
+    
+    # Get values inside to compute slope
+    x_boundary = np.array([0.0, 0.001, 1.999, 2.0])
+    cpp_boundary = compute_natural_spline_basis(x_boundary, knots, extrapolate_linear=True)
+    
+    # Left boundary slope (x=0)
+    # slope = (y(0.001) - y(0)) / 0.001
+    slope_left = (cpp_boundary[1] - cpp_boundary[0]) / 0.001
+    # Right boundary slope (x=2)
+    slope_right = (cpp_boundary[3] - cpp_boundary[2]) / 0.001
+    
+    cpp_extrap = compute_natural_spline_basis(x, knots, extrapolate_linear=True)
+    
+    # Prediction at -1 should be y(0) + slope_left * (-1 - 0)
+    expected_left = cpp_boundary[0] + slope_left * (-1.0)
+    np.testing.assert_allclose(cpp_extrap[0], expected_left, atol=1e-4) # approx deriv
+    
+    # Prediction at 3 should be y(2) + slope_right * (3 - 2)
+    expected_right = cpp_boundary[3] + slope_right * (1.0)
+    np.testing.assert_allclose(cpp_extrap[1], expected_right, atol=1e-4)
+
+@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
+def test_cpp_basis_random_knots_extrapolation():
+    rng = np.random.default_rng(123)
+    knots = np.sort(rng.uniform(0, 10, 15))
+    x = np.linspace(-5, 15, 200) # Extends well beyond [0, 10]
+    
+    cpp_N = compute_natural_spline_basis(x, knots, extrapolate_linear=True)
+    
+    # Check that for x < knots[0], second derivative is 0 (linear)
+    mask_left = x < knots[0]
+    if np.any(mask_left):
+        # We can just check that the slope is constant
+        # Taking diffs of the rows corresponding to these x's
+        # Since x is uniform, diffs should be constant
+        N_left = cpp_N[mask_left]
+        diffs = np.diff(N_left, axis=0)
+        # diffs should be constant (diff of diffs ~ 0)
+        diff2 = np.diff(diffs, axis=0)
+        np.testing.assert_allclose(diff2, 0, atol=1e-10)
+
+    # Check right side
+    mask_right = x > knots[-1]
+    if np.any(mask_right):
+        N_right = cpp_N[mask_right]
+        diffs = np.diff(N_right, axis=0)
+        diff2 = np.diff(diffs, axis=0)
+        np.testing.assert_allclose(diff2, 0, atol=1e-10)

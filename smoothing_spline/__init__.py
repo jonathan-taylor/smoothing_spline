@@ -1,1 +1,1 @@
-from smoothing_spline import SplineFitter
+from .fitter import SplineFitter

@@ -1,5 +1,6 @@
 [project]
 name = "smoothing_spline"
+dynamic = ["version"]
 authors = [
   {name="Jonathan Taylor", email="jonathan.taylor.stanford@gmail.com"},
 ]
@@ -26,7 +27,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2", "pybind11"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
