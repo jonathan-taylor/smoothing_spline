@@ -25,6 +25,17 @@ dev = [
     "pytest",
     "rpy2"
 ]
+doc = [
+    "myst-parser",
+    "sphinx",
+    "nbsphinx",
+    "ipython",
+    "ipykernel",
+    "pandas",
+    "matplotlib",
+    "ISLP",
+    "jupytext"
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2", "pybind11"]

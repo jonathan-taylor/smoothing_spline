@@ -4,7 +4,7 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
 import time
-from scipy.optimize import bisect, brentq
+from scipy.optimize import bisect, brentq, minimize_scalar
 
 @dataclass
 class SplineFitter:
@@ -162,11 +162,66 @@ class SplineFitter:
         elif self.lamval is None:
             self.lamval = 0.0
 
-    def fit(self, y):
+    def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-10, 10)):
+        """
+        Find optimal lambda using GCV and fit the model.
+        
+        Parameters
+        ----------
+        y : np.ndarray
+            Response variable.
+        sample_weight : np.ndarray, optional
+            Weights for the observations.
+        log10_lam_bounds : tuple, optional
+            Bounds for log10(lambda) search.
+        """
+        self.y = y
+        # Update weights if needed
+        if sample_weight is not None:
+            self.update_weights(sample_weight)
+            
+        if not self._cpp_fitter:
+            raise NotImplementedError("GCV optimization requires the C++ extension.")
+            
+        y_arr = np.asarray(y)
+        
+        def gcv_objective(log_lam):
+            lam = 10**log_lam
+            # Scale lambda for C++ fitter (same scaling as in fit())
+            lam_scaled = lam / (self.x_scale_**3)
+            return self._cpp_fitter.gcv_score(lam_scaled, y_arr)
+            
+        res = minimize_scalar(gcv_objective, bounds=log10_lam_bounds, method='bounded')
+        
+        if not res.success:
+            raise RuntimeError(f"GCV optimization failed: {res.message}")
+            
+        self.lamval = 10**res.x
+        
+        # Fit with the optimal lambda
+        self.fit(y)
+        return self.lamval
+
+    def fit(self, y, sample_weight=None):
         """
         Fit the smoothing spline.
         """
         self.y = y
+        
+        # Handle weights: update if provided, otherwise use self.w
+        if sample_weight is not None:
+            self.w = sample_weight
+            if self._cpp_fitter:
+                # If C++ fitter exists, use efficient update
+                # Assuming SplineFitterCpp/ReinschCpp has update_weights method (implemented in C++)
+                if hasattr(self._cpp_fitter, "update_weights"):
+                     self._cpp_fitter.update_weights(self.w)
+                else:
+                     # Fallback if method missing (shouldn't happen with updated extension)
+                     self._prepare_matrices() 
+            else:
+                self._prepare_matrices()
+        
         # Ensure lamval is not None
         if self.lamval is None:
              self.lamval = 0.0
