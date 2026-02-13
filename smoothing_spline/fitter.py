@@ -10,49 +10,7 @@ from scipy.optimize import bisect, brentq
 class SplineFitter:
     """
     Internal class to handle the fitting logic for the smoothing spline.
-    Parameters
-    ----------
-    x : np.ndarray
-        Predictor variable.
-    w : np.ndarray, optional
-        Weights for the observations. Defaults to None.
-    lamval : float, optional
-        The penalty parameter. It is generally recommended to specify the
-        degrees of freedom `df` instead of `lamval`. Defaults to None.
-    df : int, optional
-        The desired degrees of freedom. This is used to automatically
-        determine the penalty parameter `lam`. Defaults to None.
-    knots : np.ndarray, optional
-        The interior knots to use for the spline. Defaults to None.
-    n_knots : int, optional
-        The number of knots to use. If `knots` is not specified, `n_knots`
-        are chosen uniformly from the percentiles of `x`. Defaults to None.
-    Attributes
-    ----------
-    knots_ : np.ndarray
-        The knots used for the spline.
-    n_k_ : int
-        The number of knots.
-    x_min_ : float
-        The minimum value of `x`.
-    x_scale_ : float
-        The scaling factor for `x`.
-    knots_scaled_ : np.ndarray
-        The scaled knots.
-    Omega_ : np.ndarray
-        The penalty matrix.
-    N_ : np.ndarray
-        The basis matrix.
-    NTW_ : np.ndarray
-        The weighted basis matrix transposed.
-    alpha_ : np.ndarray
-        The fitted spline coefficients.
-    spline_ : CubicSpline
-        The fitted cubic spline object.
-    intercept_ : float
-        The intercept of the linear component of the fitted spline.
-    coef_ : float
-        The coefficient of the linear component of the fitted spline.
+    ...
     """
     x: np.ndarray
     w: np.ndarray = None
@@ -61,6 +19,8 @@ class SplineFitter:
     knots: np.ndarray = None
     n_knots: int = None
     
+    _cpp_fitter: object = field(init=False, default=None, repr=False)
+
     def _prepare_matrices(self):
         """
         Compute the scaled matrices required for both
@@ -98,6 +58,30 @@ class SplineFitter:
         knots_scaled = (knots - x_min) / scale
         self.knots_scaled_ = knots_scaled
 
+        try:
+            from smoothing_spline._spline_extension import SplineFitterCpp
+            # C++ implementation available
+            # Note: We pass SCALED values to C++ to match the Python logic's scaling behavior
+            # effectively treating the C++ solver as working in the scaled domain.
+            self._cpp_fitter = SplineFitterCpp(x_scaled, knots_scaled, self.w)
+            
+            # These are needed for introspection / debugging if accessed
+            # We fetch them lazily or just pre-fetch if we want full compat
+            self.N_ = self._cpp_fitter.get_N()
+            self.Omega_ = self._cpp_fitter.get_Omega()
+            
+            # Reconstruct NTW_ for compatibility if needed (C++ stores it internally)
+            if self.w is not None:
+                self.NTW_ = self.N_.T * self.w
+            else:
+                self.NTW_ = self.N_.T
+
+            return
+            
+        except ImportError:
+            self._cpp_fitter = None
+
+        # Fallback to Python Implementation
         # --- Design Matrix N ---
         cs_basis = CubicSpline(knots_scaled, np.eye(n_k), bc_type='natural')
         N_mat = cs_basis(x_scaled)
@@ -140,17 +124,6 @@ class SplineFitter:
     def _find_lamval_for_df(self, target_df, log10_lam_bounds=(-12, 12)):
         """
         Finds the exact lambda value that yields the target degrees of freedom.
-        Parameters
-        ----------
-        target_df : float
-            The target degrees of freedom.
-        log10_lam_bounds : tuple, optional
-            The bounds for the search of the log10 of the penalty parameter.
-            Defaults to (-12, 12).
-        Returns
-        -------
-        float
-            The penalty parameter `lam` that corresponds to the target `df`.
         """
         # Validate target DF
         if target_df >= self.n_k_ - 0.01:
@@ -158,15 +131,19 @@ class SplineFitter:
         if target_df <= 2.01:
             raise ValueError(f"Target DF ({target_df}) too low. Min is 2 (linear).")
 
-        XTWX = self.NTW_ @ self.N_
-
         def df_error_func(log_lam_scaled):
             lam_scaled = 10 ** log_lam_scaled
-            LHS = XTWX + lam_scaled * self.Omega_
-            S_matrix = np.linalg.solve(LHS, XTWX)
-            current_df = np.trace(S_matrix)
+            if self._cpp_fitter:
+                current_df = self._cpp_fitter.compute_df(lam_scaled)
+            else:
+                LHS = XTWX + lam_scaled * self.Omega_
+                S_matrix = np.linalg.solve(LHS, XTWX)
+                current_df = np.trace(S_matrix)
             return current_df - target_df
 
+        if not self._cpp_fitter:
+             XTWX = self.NTW_ @ self.N_
+        
         try:
             log_lam_scaled_opt = brentq(df_error_func, log10_lam_bounds[0], log10_lam_bounds[1])
         except ValueError as e:
@@ -182,24 +159,26 @@ class SplineFitter:
         self._prepare_matrices()
         if self.df is not None:
             self.lamval = self._find_lamval_for_df(self.df)
+        elif self.lamval is None:
+            self.lamval = 0.0
 
     def fit(self, y):
         """
-        Fit the smoothing spline. This method prepares the matrices,
-        finds the penalty parameter if `df` is specified, and solves
-        for the spline coefficients.
-        Parameters
-        ----------
-        y : np.ndarray
-            The response variable.
+        Fit the smoothing spline.
         """
         self.y = y
-        # Solve Ridge Regression
+        # Ensure lamval is not None
+        if self.lamval is None:
+             self.lamval = 0.0
+             
         lam_scaled = self.lamval / self.x_scale_**3
 
-        LHS = self.NTW_ @ self.N_ + lam_scaled * self.Omega_
-        RHS = self.NTW_ @ self.y
-        self.alpha_ = np.linalg.solve(LHS, RHS)
+        if self._cpp_fitter:
+            self.alpha_ = self._cpp_fitter.fit(y, lam_scaled)
+        else:
+            LHS = self.NTW_ @ self.N_ + lam_scaled * self.Omega_
+            RHS = self.NTW_ @ self.y
+            self.alpha_ = np.linalg.solve(LHS, RHS)
         
         # Store final spline
         self.spline_ = CubicSpline(self.knots_scaled_, self.alpha_, bc_type='natural')

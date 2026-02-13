@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from smoothing_spline.smoothing_spline import SplineFitter, compute_edf_reinsch
+from smoothing_spline.fitter import SplineFitter, compute_edf_reinsch
 
 
 # Setup for R comparison

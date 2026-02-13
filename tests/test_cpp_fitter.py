@@ -1,0 +1,114 @@
+
+import numpy as np
+import pytest
+from scipy import sparse
+from scipy.sparse import linalg as splinalg
+from smoothing_spline.fitter import SplineFitter
+
+try:
+    from smoothing_spline._spline_extension import SplineFitterCpp
+    CPP_AVAILABLE = True
+except ImportError:
+    CPP_AVAILABLE = False
+
+@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
+def test_cpp_fitter_integration():
+    rng = np.random.default_rng(99)
+    x = np.sort(rng.uniform(0, 10, 50))
+    knots = np.sort(rng.uniform(0, 10, 10))
+    y = np.sin(x) + rng.normal(0, 0.1, 50)
+    
+    # Python Matrices
+    py_fitter = SplineFitter(x, knots=knots)
+    py_fitter._prepare_matrices() # Computes N_, NTW_, Omega_
+    
+    # C++ Matrices via Class
+    # Note: Python implementation scales x and knots internally.
+    # C++ implementation uses raw values.
+    # To compare matrices directly, we must pass scaled values to C++ 
+    # OR adjust the comparison.
+    
+    scale = py_fitter.x_scale_
+    x_min = py_fitter.x_min_
+    x_scaled = (x - x_min) / scale
+    knots_scaled = (knots - x_min) / scale
+    
+    # 1. Compare exact matrices by passing scaled data to C++
+    cpp_fitter_scaled = SplineFitterCpp(x_scaled, knots_scaled)
+    cpp_N = cpp_fitter_scaled.get_N()
+    cpp_Omega = cpp_fitter_scaled.get_Omega()
+    
+    np.testing.assert_allclose(cpp_N, py_fitter.N_, atol=1e-8)
+    np.testing.assert_allclose(cpp_Omega, py_fitter.Omega_, atol=1e-8)
+    
+    # 2. Compare Fit (End-to-End) using raw data in C++
+    # Python uses scaled lambda and scaled matrices -> invariant objective
+    # C++ using raw data should need RAW lambda to get same alpha
+    
+    cpp_fitter_raw = SplineFitterCpp(x, knots)
+    
+    lamval = 0.5
+    # Python solve
+    lam_scaled = lamval / scale**3
+    LHS = py_fitter.NTW_ @ py_fitter.N_ + lam_scaled * py_fitter.Omega_
+    RHS = py_fitter.NTW_ @ y
+    py_alpha = np.linalg.solve(LHS, RHS)
+    
+    # C++ fit with raw lambda
+    cpp_alpha = cpp_fitter_raw.fit(y, lamval)
+    
+    np.testing.assert_allclose(cpp_alpha, py_alpha, atol=1e-5)
+
+@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
+def test_cpp_fitter_weights():
+    rng = np.random.default_rng(100)
+    x = np.sort(rng.uniform(0, 10, 50))
+    knots = np.sort(rng.uniform(0, 10, 10))
+    y = np.sin(x) + rng.normal(0, 0.1, 50)
+    w = rng.uniform(0.5, 2.0, 50)
+    
+    py_fitter = SplineFitter(x, knots=knots, w=w)
+    py_fitter._prepare_matrices()
+    
+    # C++ uses raw x, knots
+    cpp_fitter = SplineFitterCpp(x, knots, w)
+    
+    lamval = 0.5
+    # Python internally scales, so we replicate the math for verification
+    # But C++ fit(y, lamval) should work directly if logic holds
+    
+    # Verify Python's internal solve
+    scale = py_fitter.x_scale_
+    lam_scaled = lamval / scale**3
+    LHS = py_fitter.NTW_ @ py_fitter.N_ + lam_scaled * py_fitter.Omega_
+    RHS = py_fitter.NTW_ @ y
+    py_alpha = np.linalg.solve(LHS, RHS)
+    
+    # C++ fit with raw lambda
+    cpp_alpha = cpp_fitter.fit(y, lamval)
+    
+    np.testing.assert_allclose(cpp_alpha, py_alpha, atol=1e-5)
+
+@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
+def test_cpp_df():
+    rng = np.random.default_rng(101)
+    x = np.sort(rng.uniform(0, 10, 50))
+    knots = np.sort(rng.uniform(0, 10, 10))
+    
+    py_fitter = SplineFitter(x, knots=knots)
+    py_fitter._prepare_matrices()
+    
+    cpp_fitter = SplineFitterCpp(x, knots)
+    
+    lamval = 0.5
+    # Python DF
+    scale = py_fitter.x_scale_
+    lam_scaled = lamval / scale**3
+    LHS = py_fitter.NTW_ @ py_fitter.N_ + lam_scaled * py_fitter.Omega_
+    S_matrix = np.linalg.solve(LHS, py_fitter.NTW_ @ py_fitter.N_)
+    py_df = np.trace(S_matrix)
+    
+    # C++ DF with raw lambda
+    cpp_df = cpp_fitter.compute_df(lamval)
+    
+    np.testing.assert_allclose(cpp_df, py_df, atol=1e-5)

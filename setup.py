@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
@@ -34,6 +34,7 @@ setup(
     # (though `pyproject.toml` support for extensions is limited without a backend wrapper).
     # Since we have pyproject.toml using setuptools.build_meta,
     # adding a setup.py allows us to define extensions.
+    packages=find_packages(),
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext} if has_pybind11 else {},
 )
