@@ -216,17 +216,37 @@ x_syn = np.sort(np.random.uniform(0, 10, n_syn))
 y_syn = np.sin(x_syn) + np.random.normal(0, 0.1, n_syn)
 
 # Python Timing (using all unique x as knots)
-print("Python Timing (n=500):")
+print(f"Python Timing (n={n_syn}, all knots):")
 %timeit SplineFitter(x=x_syn, df=10).fit(y_syn)
 ```
 
 ```{code-cell} ipython3
 %%R -i x_syn -i y_syn
 library(microbenchmark)
-cat("R Timing (n=500):\n")
+cat(sprintf("R Timing (n=%d):\n", length(x_syn)))
+
+# Fit once to inspect knots
+fit_r_syn <- smooth.spline(x_syn, y_syn, df=10)
+n_knots_r <- fit_r_syn$fit$nk
+cat(sprintf("Number of knots used by R: %d\n", n_knots_r))
+
 microbenchmark(
   smooth.spline(x_syn, y_syn, df=10),
   times=100
 )
 ```
 
+R's `smooth.spline` automatically reduces the number of knots when $N > 49$ (typically to around 50-100) to speed up computation. The default Python behavior uses all unique $x$ values as knots.
+
+To make a fair speed comparison, we can limit the number of knots in Python as well.
+
+```{code-cell} ipython3
+# Python Timing with reduced knots
+n_knots_reduced = 50 # Similar to R's behavior
+print(f"Python Timing (n={n_syn}, n_knots={n_knots_reduced}):")
+%timeit SplineFitter(x=x_syn, df=10, n_knots=n_knots_reduced).fit(y_syn)
+```
+
+```{code-cell} ipython3
+
+```
