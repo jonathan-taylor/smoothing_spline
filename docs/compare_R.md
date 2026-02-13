@@ -1,14 +1,15 @@
 ---
 jupytext:
+  formats: md:myst,ipynb
   text_representation:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.14.0
+    jupytext_version: 1.19.1
 kernelspec:
-  display_name: Python 3
-  language: python
   name: python3
+  display_name: Python 3 (ipykernel)
+  language: python
 ---
 
 # Comparing `smoothing_spline` with R's `smooth.spline`
@@ -25,7 +26,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 from ISLP import load_data
-from smoothing_spline import SmoothingSpline
+from smoothing_spline import SplineFitter
 
 %load_ext rpy2.ipython
 ```
@@ -62,7 +63,7 @@ We fit a smoothing spline with a specified degrees of freedom ($df=5$).
 
 ```{code-cell} ipython3
 # Fit model
-spl_py = SmoothingSpline(df=5)
+spl_py = SplineFitter(df=5)
 spl_py.fit(hr_numeric, bikers)
 
 # Predict
@@ -114,7 +115,7 @@ We will compare the execution time for fitting the model.
 
 ```{code-cell} ipython3
 # Python Timing
-t_py = %timeit -o -n 10 -r 3 SmoothingSpline(df=10).fit(hr_numeric, bikers)
+t_py = %timeit -o -n 10 -r 3 SplineFitter(df=10).fit(hr_numeric, bikers)
 
 # R Timing
 ```
@@ -157,7 +158,7 @@ from scipy.optimize import minimize_scalar
 
 # Initialize fitter with data
 # Note: We use the internal C++ fitter for speed if available
-fitter = SmoothingSpline(knots=np.unique(hr_numeric)).fit(hr_numeric, bikers)
+fitter = SplineFitter(knots=np.unique(hr_numeric)).fit(hr_numeric, bikers)
 # Access the internal C++ object for GCV calculation
 cpp_fitter = fitter.fitter_._cpp_fitter
 
@@ -188,7 +189,7 @@ print(f"Selected df (Python): {best_df}")
 We can now fit the final model with the optimal parameters.
 
 ```{code-cell} ipython3
-spl_opt = SmoothingSpline(lamval=best_lam)
+spl_opt = SplineFitter(lamval=best_lam)
 spl_opt.fit(hr_numeric, bikers)
 
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -208,7 +209,7 @@ The relationship between hours and bikers might be better modeled on a log scale
 ```{code-cell} ipython3
 # Fit model on log(bikers)
 log_bikers = np.log(bikers + 1) # Add 1 to avoid log(0)
-spl_log = SmoothingSpline(df=5)
+spl_log = SplineFitter(df=5)
 spl_log.fit(hr_numeric, log_bikers)
 
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -220,4 +221,3 @@ ax.set_ylabel("Log(Number of Bikers + 1)")
 ax.legend()
 plt.show()
 ```
-
