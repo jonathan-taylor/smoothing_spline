@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+smoothing_spline/_version.py
 
 # Distribution / packaging
 .Python

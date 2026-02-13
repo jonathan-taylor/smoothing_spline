@@ -4,7 +4,6 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
 import time
-from sklearn.base import BaseEstimator
 from scipy.optimize import bisect, brentq
 
 @dataclass
@@ -275,94 +274,6 @@ class SplineFitter:
         return self.predict(self.x) - linear_part
 
 
-@dataclass
-class SmoothingSpline(BaseEstimator):
-    """
-    Penalized natural spline estimator.
-    This estimator fits a smoothing spline to the data, a popular method for
-    non-parametric regression. The smoothness of the spline is controlled by
-    a penalty parameter, which can be chosen automatically by specifying the
-    desired degrees of freedom.
-    Parameters
-    ----------
-    lamval : float, optional
-        The penalty parameter `lambda`. It is generally recommended to specify
-        the degrees of freedom `df` instead of `lamval`. If neither is
-        provided, `lamval` defaults to 0, which corresponds to interpolation.
-    df : int, optional
-        The desired degrees of freedom. This is used to automatically
-        determine the penalty parameter `lamval`.
-    degrees_of_freedom : int, optional
-        An alias for `df`.
-    knots : np.ndarray, optional
-        The interior knots to use for the spline. If not specified, the unique
-        values of `x` are used.
-    n_knots : int, optional
-        The number of knots to use. If `knots` is not specified, `n_knots`
-        are chosen uniformly from the percentiles of `x`.
-    Attributes
-    ----------
-    fitter_ : SplineFitter
-        The internal fitter object that contains the detailed results of the
-        fit, including the fitted spline, coefficients, and linear components.
-    """
-    lamval: float = None
-    df: int = None
-    degrees_of_freedom: int = None
-    knots: np.ndarray = None
-    n_knots: int = None
-    fitter_: SplineFitter = field(init=False, repr=False)
-
-    def __post_init__(self):
-        if self.degrees_of_freedom is not None:
-            if self.df is not None:
-                raise ValueError("Only one of `df` or `degrees_of_freedom` should be provided.")
-            self.df = self.degrees_of_freedom
-        
-        if self.lamval is None and self.df is None:
-            self.lamval = 0
-        
-        if self.lamval is not None and self.df is not None:
-            raise ValueError("Only one of `lamval` or `df` can be provided.")
-
-    def fit(self, x, y, w=None):
-        """
-        Fit the smoothing spline to the data.
-        Parameters
-        ----------
-        x : np.ndarray
-            The predictor variable.
-        y : np.ndarray
-            The response variable.
-        w : np.ndarray, optional
-            Weights for the observations. Defaults to None.
-        Returns
-        -------
-        self : SmoothingSpline
-            The fitted estimator.
-        """
-        self.fitter_ = SplineFitter(x,
-                                     w=w,
-                                     lamval=self.lamval,
-                                     df=self.df,
-                                     knots=self.knots,
-                                     n_knots=self.n_knots)
-        self.fitter_.fit(y)
-        return self
-
-    def predict(self, x):
-        """
-        Predict the response for a new set of predictor variables.
-        Parameters
-        ----------
-        x : np.ndarray
-            The predictor variables.
-        Returns
-        -------
-        np.ndarray
-            The predicted response.
-        """
-        return self.fitter_.predict(x)
 
 def compute_edf_reinsch(x, lamval, weights=None):
     x = np.array(x, dtype=float)
