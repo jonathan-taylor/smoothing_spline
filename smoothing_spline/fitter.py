@@ -4,7 +4,7 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
 import time
-from scipy.optimize import bisect, brentq
+from scipy.optimize import bisect, brentq, minimize_scalar
 
 @dataclass
 class SplineFitter:
@@ -161,6 +161,46 @@ class SplineFitter:
             self.lamval = self._find_lamval_for_df(self.df)
         elif self.lamval is None:
             self.lamval = 0.0
+
+    def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-10, 10)):
+        """
+        Find optimal lambda using GCV and fit the model.
+        
+        Parameters
+        ----------
+        y : np.ndarray
+            Response variable.
+        sample_weight : np.ndarray, optional
+            Weights for the observations.
+        log10_lam_bounds : tuple, optional
+            Bounds for log10(lambda) search.
+        """
+        self.y = y
+        # Update weights if needed
+        if sample_weight is not None:
+            self.update_weights(sample_weight)
+            
+        if not self._cpp_fitter:
+            raise NotImplementedError("GCV optimization requires the C++ extension.")
+            
+        y_arr = np.asarray(y)
+        
+        def gcv_objective(log_lam):
+            lam = 10**log_lam
+            # Scale lambda for C++ fitter (same scaling as in fit())
+            lam_scaled = lam / (self.x_scale_**3)
+            return self._cpp_fitter.gcv_score(lam_scaled, y_arr)
+            
+        res = minimize_scalar(gcv_objective, bounds=log10_lam_bounds, method='bounded')
+        
+        if not res.success:
+            raise RuntimeError(f"GCV optimization failed: {res.message}")
+            
+        self.lamval = 10**res.x
+        
+        # Fit with the optimal lambda
+        self.fit(y)
+        return self.lamval
 
     def fit(self, y, sample_weight=None):
         """

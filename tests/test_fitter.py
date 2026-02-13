@@ -174,3 +174,27 @@ def test_natural_spline_comparison_with_R(use_weights, has_duplicates, use_df):
     np.testing.assert_allclose(islp_pred, r_pred, rtol=1e-3, atol=1e-3)
     np.testing.assert_allclose(islp_fitter.predict(x_pred_new), r_pred_new, rtol=1e-3, atol=1e-3)
 
+def test_solve_gcv():
+    """
+    Test the solve_gcv method of SplineFitter.
+    """
+    rng = np.random.default_rng(42)
+    x = np.linspace(0, 10, 100)
+    y = np.sin(x) + rng.normal(0, 0.2, 100)
+    
+    # Fit with GCV
+    fitter = SplineFitter(x)
+    try:
+        best_lam = fitter.solve_gcv(y)
+    except NotImplementedError:
+        pytest.skip("C++ extension not available, skipping GCV test")
+        
+    assert best_lam > 0
+    assert fitter.lamval == best_lam
+    
+    # Check predictions
+    y_pred = fitter.predict(x)
+    assert y_pred.shape == x.shape
+    assert not np.allclose(y_pred, 0) # Should be a non-trivial fit
+
+
