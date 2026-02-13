@@ -34,7 +34,8 @@ doc = [
     "pandas",
     "matplotlib",
     "ISLP",
-    "jupytext"
+    "jupytext",
+    "rpy2",
 ]
 
 [build-system]
