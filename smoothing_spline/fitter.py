@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 import numpy as np
-from .base import _BaseSplineFitter
 
 @dataclass
 class SplineFitter:

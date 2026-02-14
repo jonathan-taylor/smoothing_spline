@@ -4,14 +4,28 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
 from scipy.optimize import brentq
-from smoothing_spline.base import _BaseSplineFitter
 
 @dataclass
-class SplineFitter(_BaseSplineFitter):
+class SplineFitter:
     """
     Pure Python implementation of the smoothing spline fitter.
     Moved to tests for comparison purposes.
     """
+
+    x: np.ndarray
+    w: np.ndarray = None
+    lamval: float = None
+    df: int = None
+    knots: np.ndarray = None
+    n_knots: int = None
+
+    def __post_init__(self):
+        self._prepare_matrices()
+        if self.df is not None:
+            self.lamval = self._find_lamval_for_df(self.df)
+        elif self.lamval is None:
+            self.lamval = 0.0
+
     def _prepare_matrices(self):
         """
         Compute the scaled matrices required for both
@@ -115,6 +129,44 @@ class SplineFitter(_BaseSplineFitter):
         self.intercept_ = beta[1]
         self.coef_ = beta[0]
 
+    def _setup_scaling_and_knots(self):
+        """
+        Compute the scaled values and knots required for both
+        fitting and EDF calculation.
+        """
+        x = self.x
+        weights = self.w
+        knots = self.knots
+        n_knots = self.n_knots
+        
+        n = len(x)
+        if weights is None: weights = np.ones(n)
+        
+        if knots is None:
+            if n_knots is not None:
+                percs = np.linspace(0, 100, n_knots)
+                knots = np.percentile(x, percs)
+            else:
+                knots = np.sort(np.unique(x))
+        else:
+            knots = np.asarray(knots)
+            knots.sort()
+            
+        self.knots = knots
+        n_k = len(knots)
+        self.n_k_ = n_k
+
+        # --- Standardization / Scaling ---
+        x_min, x_max = x.min(), x.max()
+        scale = x_max - x_min if x_max > x_min else 1.0
+        self.x_min_ = x_min
+        self.x_scale_ = scale
+
+        x_scaled = (x - x_min) / scale
+        knots_scaled = (knots - x_min) / scale
+        self.knots_scaled_ = knots_scaled
+        return x_scaled, knots_scaled
+
     def update_weights(self, w):
         """
         Update the weights and refit the model.
@@ -158,6 +210,14 @@ class SplineFitter(_BaseSplineFitter):
             y_pred[mask_hi] = self.alpha_[-1] + (x_scaled[mask_hi] - self.knots_scaled_[-1]) * deriv
 
         return y_pred
+
+    @property
+    def nonlinear_(self):
+        """
+        The non-linear component of the fitted spline.
+        """
+        linear_part = self.coef_ * self.x + self.intercept_
+        return self.predict(self.x) - linear_part
 
     def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-10, 10)):
         """
