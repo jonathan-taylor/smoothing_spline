@@ -42,7 +42,7 @@
 <section id="Setup">
 <h2>Setup<a class="headerlink" href="#Setup" title="Link to this heading">¶</a></h2>
 <p>First, we need to import the necessary libraries and load the <code class="docutils literal notranslate"><span class="pre">rpy2</span></code> extension to run R code directly in this notebook.</p>
-<div class="nbinput nblast docutils container">
+<div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
@@ -56,6 +56,15 @@
 <span class="o">%</span><span class="k">load_ext</span> rpy2.ipython
 </pre></div>
 </div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Error importing in API mode: ImportError(&#34;dlopen(/Users/jonathantaylor/git-repos/ISLP/smoothing_spline/.venv/lib/python3.13/site-packages/_rinterface_cffi_api.abi3.so, 0x0002): Library not loaded: /Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRblas.dylib\n  Referenced from: &lt;B96A8100-FA7A-3EFC-8726-931D26646DE6&gt; /Users/jonathantaylor/git-repos/ISLP/smoothing_spline/.venv/lib/python3.13/site-packages/_rinterface_cffi_api.abi3.so\n  Reason: tried: &#39;/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRblas.dylib&#39; (no such file), &#39;/System/Volumes/Preboot/Cryptexes/OS/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRblas.dylib&#39; (no such file), &#39;/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRblas.dylib&#39; (no such file)&#34;)
+Trying to import in ABI mode.
+</pre></div></div>
 </div>
 </section>
 <section id="Loading-the-Data">
@@ -302,7 +311,7 @@
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Mean Absolute Difference: 0.003490
+Mean Absolute Difference: 0.003491
 </pre></div></div>
 </div>
 </section>
@@ -326,7 +335,7 @@ Mean Absolute Difference: 0.003490
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-5.86 ms ± 139 μs per loop (mean ± std. dev. of 3 runs, 10 loops each)
+1.24 ms ± 91.5 μs per loop (mean ± std. dev. of 3 runs, 10 loops each)
 </pre></div></div>
 </div>
 <div class="nbinput docutils container">
@@ -343,16 +352,27 @@ Mean Absolute Difference: 0.003490
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Unit: microseconds
+                                       expr     min       lq     mean   median
+ smooth.spline(hr_numeric, bikers, df = 10) 941.155 1013.356 1052.183 1020.244
+       uq      max neval
+ 1079.694 1329.589    10
+</pre></div></div>
+</div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Unit: milliseconds
-                                       expr     min       lq     mean   median
- smooth.spline(hr_numeric, bikers, df = 10) 1.44887 1.935027 2.047321 2.165126
-       uq      max neval
- 2.178671 2.202767    10
+In addition: Warning message:
+In microbenchmark(smooth.spline(hr_numeric, bikers, df = 10), times = 10) :
+  less accurate nanosecond times to avoid potential integer overflows
+
 </pre></div></div>
 </div>
 </section>
@@ -416,8 +436,8 @@ Selected lambda (R): 9.504108e-05
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-Selected lambda (Python): 1.1524167755954249
-Selected df (Python): 23.10044204963742
+Selected lambda (Python): 2.9772068125418998e-05
+Selected df (Python): 23.99997440744539
 </pre></div></div>
 </div>
 <p>We can now visualize the optimal fit.</p>
@@ -480,8 +500,8 @@ Selected df (Python): 23.10044204963742
 <section id="Synthetic-Speed-Comparison-(N=500)">
 <h2>Synthetic Speed Comparison (N=500)<a class="headerlink" href="#Synthetic-Speed-Comparison-(N=500)" title="Link to this heading">¶</a></h2>
 <p>Finally, we compare the speed of both implementations on a synthetic dataset with 500 unique <span class="math notranslate nohighlight">\(x\)</span> values.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Synthetic data</span>
@@ -496,17 +516,8 @@ Selected df (Python): 23.10044204963742
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Python Timing (n=500, all knots):
-761 ms ± 2.88 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-</pre></div></div>
-</div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
 </pre></div>
 </div>
 <div class="input_area highlight-r notranslate"><div class="highlight"><pre><span></span><span class="o">%%</span><span class="n">R</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="n">x_syn</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="n">y_syn</span>
@@ -530,13 +541,7 @@ Python Timing (n=500, all knots):
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-R Timing (n=500):
-Number of knots used by R: 502
-Unit: milliseconds
-                                 expr      min       lq     mean   median
- smooth.spline(x_syn, y_syn, df = 10) 1.018048 1.030942 1.045293 1.038826
-       uq     max neval
- 1.050628 1.41628   100
+258 ms ± 1 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 </pre></div></div>
 </div>
 </section>
@@ -544,8 +549,8 @@ Unit: milliseconds
 <h2>Limited knots<a class="headerlink" href="#Limited-knots" title="Link to this heading">¶</a></h2>
 <p>R’s <code class="docutils literal notranslate"><span class="pre">smooth.spline</span></code> automatically reduces the number of knots when <span class="math notranslate nohighlight">\(N &gt; 49\)</span> (typically to around 50-100) to speed up computation. For <span class="math notranslate nohighlight">\(N=10000\)</span>, <code class="docutils literal notranslate"><span class="pre">R</span></code> uses about 200 knots.</p>
 <p>To make a fair speed comparison, we can limit the number of knots in Python as well.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Python Timing with reduced knots</span>
@@ -558,17 +563,8 @@ Unit: milliseconds
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Python Timing (n=10000, n_knots=200):
-91.1 ms ± 5.57 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
-</pre></div></div>
-</div>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[28]:
 </pre></div>
 </div>
 <div class="input_area highlight-r notranslate"><div class="highlight"><pre><span></span><span class="o">%%</span><span class="n">R</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="n">x_syn</span><span class="w"> </span><span class="o">-</span><span class="n">i</span><span class="w"> </span><span class="n">y_syn</span>
@@ -592,23 +588,15 @@ Python Timing (n=10000, n_knots=200):
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-R Timing (n=10000):
-Number of knots used by R: 202
-Unit: milliseconds
-                                 expr      min       lq     mean   median
- smooth.spline(x_syn, y_syn, df = 10) 29.95092 31.69646 33.13524 31.92739
-       uq      max neval
- 33.38507 58.85176   100
+104 ms ± 1.6 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
 </pre></div></div>
 </div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
-</pre></div>
-</div>
-</div>
+</section>
+<section id="Performance-Note">
+<h2>Performance Note<a class="headerlink" href="#Performance-Note" title="Link to this heading">¶</a></h2>
+<p>While the C++ implementation offers significant speedups over the pure Python version, it is currently slower than R’s <code class="docutils literal notranslate"><span class="pre">smooth.spline</span></code> for exact degrees of freedom calculation. This is because our current implementation of the EDF calculation involves <span class="math notranslate nohighlight">\(O(N^2)\)</span> operations (specifically, <span class="math notranslate nohighlight">\(N\)</span> back-solves to compute the trace of the inverse), whereas R likely uses a specialized <span class="math notranslate nohighlight">\(O(N)\)</span> algorithm for computing the trace of a banded matrix inverse.</p>
+<p>For large <span class="math notranslate nohighlight">\(N\)</span>, the Hutchinson estimator (randomized trace estimation) is used to mitigate this cost, reducing the complexity to <span class="math notranslate nohighlight">\(O(k \cdot N)\)</span> where <span class="math notranslate nohighlight">\(k\)</span> is the number of random vectors (default 30).</p>
+<p><strong>TODO:</strong> Implement exact <span class="math notranslate nohighlight">\(O(N)\)</span> trace calculation for pentadiagonal matrices to match R’s performance for exact EDF.</p>
 </section>
 </section>
 
@@ -650,6 +638,7 @@ Unit: milliseconds
 <li class="toctree-l2"><a class="reference internal" href="#Another-Example:-Log-Transformation">Another Example: Log-Transformation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Synthetic-Speed-Comparison-(N=500)">Synthetic Speed Comparison (N=500)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Limited-knots">Limited knots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Performance-Note">Performance Note</a></li>
 </ul>
 </li>
 </ul>
