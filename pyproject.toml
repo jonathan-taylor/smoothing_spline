@@ -16,7 +16,6 @@ classifiers = [
 ]
 dependencies = [
     "numpy",
-    "scikit-learn",
 ]
 
 [project.optional-dependencies]
