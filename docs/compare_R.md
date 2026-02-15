@@ -25,8 +25,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
-from ISLP import load_data
-from smoothing_spline import SplineFitter
+from smoothing_spline import load_bikeshare, SplineFitter
 
 %load_ext rpy2.ipython
 ```
@@ -36,7 +35,8 @@ from smoothing_spline import SplineFitter
 We will use the `Bikeshare` dataset, which contains daily counts of bike rentals in Washington D.C.
 
 ```{code-cell} ipython3
-Bike = load_data('Bikeshare')
+with load_bikeshare() as f:
+    Bike = pd.read_csv(f)
 Bike.head()
 ```
 

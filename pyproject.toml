@@ -36,5 +36,8 @@ doc = [
 requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.2", "pybind11"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.package-data]
+smoothing_spline = ["data/*.csv"]
+
 [tool.setuptools_scm]
 write_to = "smoothing_spline/_version.py"
