@@ -746,7 +746,7 @@ public:
         Eigen::VectorXd w = weights_inv_.cwiseInverse();
         double rss = (resid.array().square() * w.array()).sum();
         
-        double df = compute_df_sparse(lamval);
+        double df = compute_df(lamval);
         double n = (double)y.size();
         double denom = 1.0 - df / n;
         if (denom < 1e-6) return 1e20;
@@ -757,9 +757,13 @@ public:
     double solve_for_df(double target_df) {
         auto func = [&](double log_lam) {
             double lam = std::pow(10.0, log_lam);
-            return compute_df_sparse(lam) - target_df;
+            return compute_df(lam) - target_df;
         };
         double log_lam_opt = brent_root(func, -12.0, 12.0);
+	double df_sparse = compute_df_sparse(std::pow(10.0, log_lam_opt)); // Call the other function explicitly for comparison
+        std::cout << "DF from compute_df_sparse: " << df_sparse << std::endl;
+        double df_exact = compute_df(std::pow(10.0, log_lam_opt)); // Call the other function explicitly for comparison
+        std::cout << "DF from compute_df (exact trace): " << df_exact << std::endl;
         return std::pow(10.0, log_lam_opt);
     }
 
