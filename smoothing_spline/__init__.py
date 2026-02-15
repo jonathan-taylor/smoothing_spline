@@ -1,2 +1,2 @@
-from .fitter import SplineFitter
+from .fitter import SplineFitter, SplineFitterBSpline
 from .datasets import load_bikeshare
