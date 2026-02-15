@@ -89,8 +89,7 @@ ax.axvline(x.max(), color='gray', linestyle=':', alpha=0.5)
 ax.set_title('Extrapolation Behavior: Natural vs. SciPy Spline')
 ax.legend()
 ax.grid(True, alpha=0.3)
-
-plt.show()
+ax.set_ylim([-10,10])
 ```
 
 ## Analysis
