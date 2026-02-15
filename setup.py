@@ -7,7 +7,13 @@ from pybind11.setup_helpers import Pybind11Extension, build_ext
 ext_modules = [
     Pybind11Extension(
         "smoothing_spline._spline_extension",
-        ["src/spline_basis.cpp"],
+        [
+            "src/main.cpp",
+            "src/utils.cpp",
+            "src/natural_spline.cpp",
+            "src/reinsch.cpp",
+            "src/bspline.cpp"
+        ],
         # Example: passing in the version
         define_macros = [('VERSION_INFO', '"0.0.1"')],
         include_dirs = ["src/eigen"],

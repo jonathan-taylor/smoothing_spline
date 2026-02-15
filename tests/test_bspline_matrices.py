@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from scipy.interpolate import BSpline
-from smoothing_spline.fitter import SplineFitterBSpline
+from smoothing_spline.fitter import SplineFitter
 
 def compute_ref_matrices(x, knots, order=4, weights=None):
     if weights is None:
@@ -70,7 +70,7 @@ def test_matrices(n_samples, uniform, weighted):
     else:
         w = None
         
-    sf = SplineFitterBSpline(x, w=w, knots=knots)
+    sf = SplineFitter(x, w=w, knots=knots, engine='bspline')
     cpp_NTWN = sf._cpp_fitter.get_NTWN()
     cpp_Omega = sf._cpp_fitter.get_Omega()
     cpp_knots = sf._cpp_fitter.get_knots()

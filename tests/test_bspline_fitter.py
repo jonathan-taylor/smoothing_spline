@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from smoothing_spline.fitter import SplineFitter, SplineFitterBSpline
+from smoothing_spline.fitter import SplineFitter
 
 @pytest.mark.parametrize("n_samples", [50, 100])
 @pytest.mark.parametrize("weighted", [False, True])
@@ -21,24 +21,20 @@ def test_compare_bspline_natural_spline(n_samples, weighted, unequal_x):
     else:
         w = None
         
-    # Use a fixed lambda
-    lamval = 1e-1
-    
     # Use fewer knots than n_samples to ensure smoothing behavior
     # and to make sure we are not just interpolating
     n_knots = int(n_samples / 3)
     percs = np.linspace(0, 100, n_knots)
     knots = np.percentile(x, percs)
-    print(knots)
+    
     # 1. Natural Spline Fitter
-    sf = SplineFitter(x, w=w, knots=knots, df=10)
-    lamval = sf.lamval
-
+    sf = SplineFitter(x, w=w, knots=knots, df=10, engine='natural')
     sf.fit(y)
     y_pred_ns = sf.predict(x)
+    lamval = sf.lamval
     
     # 2. B-Spline Fitter
-    sf_bs = SplineFitterBSpline(x, w=w, knots=knots, lamval=lamval)
+    sf_bs = SplineFitter(x, w=w, knots=knots, lamval=lamval, engine='bspline')
     try:
         sf_bs.fit(y)
     except RuntimeError as e:

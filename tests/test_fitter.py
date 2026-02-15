@@ -12,7 +12,7 @@ try:
 except ImportError:
     R_ENABLED = False
 
-from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
+from smoothing_spline._spline_extension import NaturalSplineFitter as ExtSplineFitterCpp
 
 # Create a fixture to parametrize tests over both implementations
 @pytest.fixture()

@@ -5,7 +5,7 @@ from scipy.sparse import linalg as splinalg
 from smoothing_spline.fitter import SplineFitter
 from tests.spline_fitter import SplineFitter as SplineFitterPy
 
-from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
+from smoothing_spline._spline_extension import NaturalSplineFitter as ExtSplineFitterCpp
 
 def test_cpp_fitter_integration():
     rng = np.random.default_rng(99)
