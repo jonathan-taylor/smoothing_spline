@@ -37,7 +37,8 @@ jobs:
 
       - name: Build docs
         run: |
-          jupyter-book build docs
+          cd docs
+          jupyter book build --html --execute
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
