@@ -2,6 +2,19 @@
 #include "utils.h"
 #include <iostream>
 
+/**
+ * Computes the Natural Cubic Spline basis matrix N.
+ * 
+ * The natural cubic spline basis functions N_j(x) are defined such that any natural spline f(x)
+ * with knots at 'knots' can be written as f(x) = sum_j alpha_j * N_j(x).
+ * 
+ * We use the standard construction where the second derivatives M at the knots satisfy a 
+ * tridiagonal system (A * M = B * alpha). This function effectively inverts this relationship 
+ * to express the spline values directly in terms of the coefficients alpha.
+ * 
+ * If extrapolate_linear is true, the spline is extended linearly beyond the boundary knots,
+ * consistent with the definition of a natural spline (zero second derivative implies linear).
+ */
 Eigen::MatrixXd compute_natural_spline_basis(
     const Eigen::Ref<const Eigen::VectorXd>& x,
     const Eigen::Ref<const Eigen::VectorXd>& knots,
@@ -149,6 +162,17 @@ Eigen::MatrixXd compute_natural_spline_basis(
     return N;
 }
 
+/**
+ * Computes the roughness penalty matrix Omega for natural cubic splines.
+ * 
+ * Omega_ij = Integral phi''_i(x) * phi''_j(x) dx
+ * 
+ * The penalty term in the objective function is lambda * alpha^T * Omega * alpha.
+ * This function essentially computes the matrix K in the standard notation (or close to it)
+ * by solving R^T Omega R = Q^T Q (conceptually) or using the property that 
+ * for natural splines, the integral of squared second derivatives reduces to a form 
+ * involving the tridiagonal matrix R and the band matrix Q.
+ */
 Eigen::MatrixXd compute_penalty_matrix(const Eigen::Ref<const Eigen::VectorXd>& knots) {
     long n_knots = knots.size();
     if (n_knots < 2) return Eigen::MatrixXd::Zero(n_knots, n_knots);

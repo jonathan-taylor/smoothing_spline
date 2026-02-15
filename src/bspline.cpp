@@ -5,6 +5,16 @@
 #include <algorithm>
 
 namespace bspline {
+    /**
+     * Evaluates B-spline basis functions and their derivatives using the Cox-de Boor recursion.
+     * 
+     * @param x The evaluation point.
+     * @param k The order of the B-spline (degree + 1).
+     * @param knots The knot vector.
+     * @param span_index Output parameter for the knot span index.
+     * @param N Output vector containing the non-zero basis function values.
+     * @param deriv The order of derivative to compute (0, 1, or 2).
+     */
     void eval_bspline_basis(double x, int k, const Eigen::VectorXd& knots, int& span_index, Eigen::VectorXd& N, int deriv) {
         int n_k = (int)knots.size();
         double d_min = knots[k-1], d_max = knots[n_k-k];
@@ -59,6 +69,12 @@ BSplineFitter::BSplineFitter(const Eigen::Ref<const Eigen::VectorXd>& x, const E
     Omega_band_ = Eigen::MatrixXd::Zero(kd + 1, n_basis_); compute_penalty_matrix();
 }
 
+/**
+ * Computes the matrix N^T W N, where N is the B-spline basis matrix.
+ * 
+ * Since B-splines have compact support, this matrix is banded.
+ * This implementation iterates over data points and updates the relevant band elements.
+ */
 void BSplineFitter::compute_NTWN() {
     Eigen::VectorXd b_v(order_); int s_i;
     for (int i = 0; i < x_.size(); ++i) {
@@ -73,13 +89,15 @@ void BSplineFitter::compute_NTWN() {
 /**
  * Computes the penalty matrix Omega using a quadrature rule.
  * 
+ * Omega_ij = Integral phi''_i(x) * phi''_j(x) dx
+ * 
  * This function calculates the inner product of the second derivatives of the B-spline basis functions.
  * It iterates over the knot intervals and uses a 2-point Gaussian quadrature rule to approximate the integral.
  * 
  * The quadrature points and weights are hardcoded for efficiency:
  *   - pt: 1/sqrt(3)
  *   - gp: {-pt, pt} (Gaussian points)
- *   - gw: {1.0, 1.0} (Gaussian weights)
+ *   - gw: {1.0, 1.0} (Gaussian weights scaled by interval half-width)
  * 
  * The resulting matrix is stored in a banded format (Omega_band_) suitable for efficient solving.
  */
@@ -120,6 +138,18 @@ Eigen::MatrixXd BSplineFitter::get_Omega() {
     return M;
 }
 
+/**
+ * Fits the B-spline model by solving the penalized least squares problem.
+ * 
+ * The problem is: min ||y - N*alpha||^2 + lambda * alpha^T * Omega * alpha
+ * Normal equations: (N^T W N + lambda * Omega) * alpha = N^T W y
+ * 
+ * This system is banded. The implementation uses LAPACK's 'dpbsv' (Symmetric Positive Definite Banded Solver)
+ * for efficiency.
+ * 
+ * Additionally, it enforces natural boundary conditions (second derivative zero at endpoints)
+ * by modifying the linear system (eliminating coefficients via constraints).
+ */
 void BSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
     int n = n_basis_, kd = order_ - 1, ldab = kd + 1;
     Eigen::MatrixXd AB = AB_template_ + lamval * Omega_band_; Eigen::VectorXd b = Eigen::VectorXd::Zero(n), b_v(order_); int s_i;

@@ -4,6 +4,17 @@
 #include <cmath>
 #include <iostream>
 
+/**
+ * Computes the non-zero bands of the matrices Q and R used in the Reinsch algorithm.
+ * 
+ * R is a tridiagonal matrix with:
+ *   R_ii = (h[i] + h[i+1]) / 3
+ *   R_i,i+1 = h[i+1] / 6
+ * 
+ * M = Q^T W^-1 Q is a pentadiagonal matrix.
+ * This function precomputes the diagonal and off-diagonal elements of R and M
+ * to enable efficient O(N) operations later.
+ */
 void CubicSplineTraceCpp::compute_QR_bands() {
     int n_inner = n_ - 2;
     R_diag.resize(n_inner); R_off.resize(n_inner - 1);
@@ -30,6 +41,16 @@ CubicSplineTraceCpp::CubicSplineTraceCpp(const Eigen::Ref<const Eigen::VectorXd>
     compute_QR_bands();
 }
 
+/**
+ * Computes the trace of the influence matrix (Effective Degrees of Freedom) in O(N).
+ * 
+ * The influence matrix is S = (I + lambda * K)^-1, where K = Q R^-1 Q^T W^-1.
+ * The trace is equivalent to: 2 + Trace(R * (R + lambda * M)^-1)
+ * 
+ * It uses the Cholesky decomposition of the banded matrix B = R + lambda * M,
+ * followed by Takahashi's equations (sparse inverse subset) to compute the necessary 
+ * elements of B^-1 to find the trace product with R.
+ */
 double CubicSplineTraceCpp::compute_trace(double lam) {
     int n_inner = n_ - 2;
     Eigen::VectorXd B_diag = R_diag + lam * M_diag; B_diag.array() += 1e-9;
@@ -67,6 +88,16 @@ double CubicSplineTraceCpp::compute_trace(double lam) {
     return 2.0 + tr_RBinv;
 }
 
+/**
+ * ReinschFitter implements the smoothing spline using the Reinsch algorithm.
+ * 
+ * This approach is valid when the knots are exactly the unique data points x.
+ * It solves the linear system for the second derivatives gamma:
+ *   (R + lambda * Q^T W^-1 Q) * gamma = Q^T * y
+ * 
+ * The fitted values f are then recovered via:
+ *   f = y - lambda * W^-1 * Q * gamma
+ */
 ReinschFitter::ReinschFitter(const Eigen::Ref<const Eigen::VectorXd>& x, py::object weights_obj) {
     x_ = x; n_ = x.size(); long n_inner = n_ - 2;
     Eigen::VectorXd h = x.segment(1, n_ - 1) - x.segment(0, n_ - 1);
