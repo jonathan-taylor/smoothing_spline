@@ -420,9 +420,9 @@ public:
         return alpha_;
     }
 
-    Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_new) {
+    Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv=0) {
         if (alpha_.size() == 0) throw std::runtime_error("Model not fitted");
-        Eigen::MatrixXd N_new = compute_natural_spline_basis(x_new, knots_);
+        Eigen::MatrixXd N_new = compute_natural_spline_basis(x_new, knots_, true, deriv);
         return N_new * alpha_;
     }
     
@@ -640,7 +640,7 @@ public:
         return std::pow(10.0, log_lam_opt);
     }
 
-    Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_new) {
+    Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv=0) {
         if (f_.size() == 0) throw std::runtime_error("Model not fitted");
         
         Eigen::VectorXd M(n_);
@@ -667,19 +667,43 @@ public:
             
             if (val < x_[0]) {
                 double h = x_[1] - x_[0];
-                double deriv = (f_[1] - f_[0]) / h - h * M[1] / 6.0;
-                y_pred[i] = f_[0] + deriv * (val - x_[0]);
+                double first_deriv = (f_[1] - f_[0]) / h - h * M[1] / 6.0;
+                if (deriv == 0) {
+                    y_pred[i] = f_[0] + first_deriv * (val - x_[0]);
+                } else if (deriv == 1) {
+                    y_pred[i] = first_deriv;
+                } else {
+                    y_pred[i] = 0;
+                }
             } else if (val > x_[n_-1]) {
                 long last_k = n_ - 2;
                 double h = x_[last_k+1] - x_[last_k];
-                double deriv = (f_[last_k+1] - f_[last_k]) / h + M[last_k] * h / 6.0 + M[last_k+1] * h / 3.0;
-                y_pred[i] = f_[n_-1] + deriv * (val - x_[n_-1]);
+                double first_deriv = (f_[last_k+1] - f_[last_k]) / h + M[last_k] * h / 6.0 + M[last_k+1] * h / 3.0;
+                if (deriv == 0) {
+                    y_pred[i] = f_[n_-1] + first_deriv * (val - x_[n_-1]);
+                } else if (deriv == 1) {
+                    y_pred[i] = first_deriv;
+                } else {
+                    y_pred[i] = 0;
+                }
             } else {
                 double h = x_[k+1] - x_[k];
-                double term1 = (std::pow(x_[k+1] - val, 3) * M[k] + std::pow(val - x_[k], 3) * M[k+1]) / (6.0 * h);
-                double term2 = (f_[k] - h*h * M[k] / 6.0) * (x_[k+1] - val) / h;
-                double term3 = (f_[k+1] - h*h * M[k+1] / 6.0) * (val - x_[k]) / h;
-                y_pred[i] = term1 + term2 + term3;
+                if (deriv == 0) {
+                    double term1 = (std::pow(x_[k+1] - val, 3) * M[k] + std::pow(val - x_[k], 3) * M[k+1]) / (6.0 * h);
+                    double term2 = (f_[k] - h*h * M[k] / 6.0) * (x_[k+1] - val) / h;
+                    double term3 = (f_[k+1] - h*h * M[k+1] / 6.0) * (val - x_[k]) / h;
+                    y_pred[i] = term1 + term2 + term3;
+                } else if (deriv == 1) {
+                    double d_term1 = (-3.0 * std::pow(x_[k+1] - val, 2) * M[k] + 3.0 * std::pow(val - x_[k], 2) * M[k+1]) / (6.0 * h);
+                    double d_term2 = -(f_[k] - h*h * M[k] / 6.0) / h;
+                    double d_term3 = (f_[k+1] - h*h * M[k+1] / 6.0) / h;
+                    y_pred[i] = d_term1 + d_term2 + d_term3;
+                } else if (deriv == 2) {
+                    double d2_term1 = (6.0 * (x_[k+1] - val) * M[k] + 6.0 * (val - x_[k]) * M[k+1]) / (6.0 * h);
+                    y_pred[i] = d2_term1;
+                } else {
+                    y_pred[i] = 0;
+                }
             }
         }
         return y_pred;
@@ -716,7 +740,7 @@ PYBIND11_MODULE(_spline_extension, m) {
         .def("solve_gcv", &SplineFitterCpp::solve_gcv, "Solve for GCV optimal lambda",
              py::arg("y"), py::arg("min_log_lam") = -12.0, py::arg("max_log_lam") = 12.0)
         .def("predict", &SplineFitterCpp::predict, "Predict at new points",
-             py::arg("x_new"))
+             py::arg("x_new"), py::arg("deriv")=0)
         .def("get_N", &SplineFitterCpp::get_N)
         .def("get_Omega", &SplineFitterCpp::get_Omega);
 
@@ -737,5 +761,5 @@ PYBIND11_MODULE(_spline_extension, m) {
         .def("solve_gcv", &SplineFitterReinschCpp::solve_gcv, "Solve for GCV optimal lambda",
              py::arg("y"), py::arg("min_log_lam") = -12.0, py::arg("max_log_lam") = 12.0)
         .def("predict", &SplineFitterReinschCpp::predict, "Predict at new points",
-             py::arg("x_new"));
+             py::arg("x_new"), py::arg("deriv")=0);
 }

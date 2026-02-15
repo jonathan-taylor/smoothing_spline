@@ -1,4 +1,3 @@
-
 import numpy as np
 import pytest
 from smoothing_spline.fitter import SplineFitter
