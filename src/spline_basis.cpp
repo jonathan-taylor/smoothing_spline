@@ -657,6 +657,7 @@ public:
         Eigen::VectorXd d2_v(order_); bspline::eval_bspline_basis(knots_[order_-1], order_, knots_, s_i, d2_v, 2);
         double v0 = d2_v[0], v1 = d2_v[1], v2 = d2_v[2]; if (std::abs(v0) < 1e-12) throw std::runtime_error("Leading zero: v0=" + std::to_string(v0));
         double ws1 = -v1 / v0, ws2 = -v2 / v0, a00 = get_A(0,0), a01 = get_A(1,0), a02 = get_A(2,0), a03 = get_A(3,0), a11 = get_A(1,1), a12 = get_A(2,1), a13 = get_A(3,1), a22 = get_A(2,2), a23 = get_A(3,2);
+        // std::cout << "ws1: " << ws1 << ", ws2: " << ws2 << ", v0: " << v0 << std::endl;
         AB(0, 1) = a11 + 2*ws1*a01 + ws1*ws1*a00; AB(1, 1) = a12 + ws1*a02 + ws2*a01 + ws1*ws2*a00; AB(0, 2) = a22 + 2*ws2*a02 + ws2*ws2*a00;
         if (kd >= 3) { AB(2, 1) = a13 + ws1*a03; AB(1, 2) = a23 + ws2*a03; }
         b[1] += ws1 * b[0]; b[2] += ws2 * b[0];
@@ -664,11 +665,13 @@ public:
         int iN1 = n-1-s_i, iN2 = n-2-s_i, iN3 = n-3-s_i;
         double u0 = d2_v[iN1], u1 = d2_v[iN2], u2 = d2_v[iN3]; if (std::abs(u0) < 1e-12) throw std::runtime_error("Trailing zero: u0=" + std::to_string(u0));
         double we1 = -u1 / u0, we2 = -u2 / u0, an11 = get_A(n-1, n-1), an12 = get_A(n-1, n-2), an13 = get_A(n-1, n-3), an14 = get_A(n-1, n-4), an22 = get_A(n-2, n-2), an23 = get_A(n-2, n-3), an24 = get_A(n-2, n-4), an33 = get_A(n-3, n-3), an34 = get_A(n-3, n-4);
+        // std::cout << "we1: " << we1 << ", we2: " << we2 << ", u0: " << u0 << std::endl;
         AB(0, n-2) = an22 + 2*we1*an12 + we1*we1*an11; AB(1, n-3) = an23 + we1*an13 + we2*an12 + we1*we2*an11; AB(0, n-3) = an33 + 2*we2*an13 + we2*we2*an11;
         if (kd >= 3) { AB(2, n-4) = an24 + we1*an14; AB(1, n-4) = an34 + we2*an14; }
         b[n-2] += we1 * b[n-1]; b[n-3] += we2 * b[n-1];
         int n_r = n - 2, nrhs = 1, info = 0; char u_c = 'L'; dpbsv_(&u_c, &n_r, &kd, &nrhs, AB.data() + ldab * 1, &ldab, b.data() + 1, &n, &info);
         if (info > 0) {
+            std::cerr << "dpbsv failed with info: " << info << std::endl;
             Eigen::MatrixXd Af = Eigen::MatrixXd::Zero(n_r, n_r);
             for (int j = 0; j < n_r; ++j) { for (int r = 0; r <= kd; ++r) { if (j + r < n_r) { double v = AB(r, j + 1); Af(j + r, j) = v; Af(j, j + r) = v; } } }
             Eigen::LDLT<Eigen::MatrixXd> sol; sol.compute(Af); b.segment(1, n_r) = sol.solve(b.segment(1, n_r));
@@ -697,7 +700,7 @@ public:
 
 PYBIND11_MODULE(_spline_extension, m) {
     py::class_<SplineFitterCpp>(m, "SplineFitterCpp").def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, py::object>()).def("fit", &SplineFitterCpp::fit).def("update_weights", &SplineFitterCpp::update_weights).def("compute_df", &SplineFitterCpp::compute_df).def("gcv_score", &SplineFitterCpp::gcv_score).def("solve_for_df", &SplineFitterCpp::solve_for_df).def("solve_gcv", &SplineFitterCpp::solve_gcv).def("predict", &SplineFitterCpp::predict).def("get_N", &SplineFitterCpp::get_N).def("get_Omega", &SplineFitterCpp::get_Omega);
-    py::class_<SplineFitterReinschCpp>(m, "SplineFitterReinschCpp").def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, py::object>()).def("fit", &SplineFitterReinschCpp::fit).def("update_weights", &SplineFitterReinschCpp::update_weights).def("compute_df", &SplineFitterReinschCpp::compute_df).def("compute_df_sparse", &SplineFitterReinschCpp::compute_df_sparse).def("gcv_score", &SplineFitterReinschCpp::gcv_score).def("solve_for_df", &SplineFitterReinschCpp::solve_for_df).def("solve_gcv", &SplineFitterReinschCpp::solve_gcv).def("predict", &SplineFitterReinschCpp::predict);
+    py::class_<SplineFitterReinschCpp>(m, "SplineFitterReinschCpp").def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, py::object>()).def("fit", &SplineFitterReinschCpp::fit).def("update_weights", &SplineFitterReinschCpp::update_weights).def("compute_df", &SplineFitterReinschCpp::compute_df).def("gcv_score", &SplineFitterReinschCpp::gcv_score).def("solve_for_df", &SplineFitterReinschCpp::solve_for_df).def("solve_gcv", &SplineFitterReinschCpp::solve_gcv).def("predict", &SplineFitterReinschCpp::predict);
     py::class_<CubicSplineTraceCpp>(m, "CubicSplineTraceCpp").def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, py::object>()).def("compute_trace", &CubicSplineTraceCpp::compute_trace);
     py::class_<SplineFitterBSpline>(m, "SplineFitterBSpline").def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, py::object, int>()).def("fit", &SplineFitterBSpline::fit).def("predict", &SplineFitterBSpline::predict).def("get_NTWN", &SplineFitterBSpline::get_NTWN).def("get_Omega", &SplineFitterBSpline::get_Omega).def("get_knots", &SplineFitterBSpline::get_knots).def("eval_basis", &SplineFitterBSpline::eval_basis, py::arg("x_val"), py::arg("deriv")=0);
 }

@@ -22,16 +22,18 @@ def test_compare_bspline_natural_spline(n_samples, weighted, unequal_x):
         w = None
         
     # Use a fixed lambda
-    lamval = 1e-4
+    lamval = 1e-1
     
     # Use fewer knots than n_samples to ensure smoothing behavior
     # and to make sure we are not just interpolating
-    n_knots = int(n_samples / 5)
+    n_knots = int(n_samples / 3)
     percs = np.linspace(0, 100, n_knots)
     knots = np.percentile(x, percs)
-
+    print(knots)
     # 1. Natural Spline Fitter
-    sf = SplineFitter(x, w=w, knots=knots, lamval=lamval)
+    sf = SplineFitter(x, w=w, knots=knots, df=10)
+    lamval = sf.lamval
+
     sf.fit(y)
     y_pred_ns = sf.predict(x)
     
@@ -52,26 +54,21 @@ def test_compare_bspline_natural_spline(n_samples, weighted, unequal_x):
     print(f"MSE: {mse:.2e}")
     
     # Check extrapolation
-    x_extra = np.array([-0.1, 1.1])
+    x_extra = np.linspace(-0.1, 1.1, 51)
     y_extra_ns = sf.predict(x_extra)
     y_extra_bs = sf_bs.predict(x_extra)
     
-    import matplotlib.pyplot as plt
-    plt.plot(x_extra, y_extra_ns, 'natural spline')
-    plt.plot(x_extra, y_extra_bs, 'B spline')
-    
-
     mse_extra = np.mean((y_extra_ns - y_extra_bs)**2)
     print(f"Extrapolation MSE: {mse_extra:.2e}")
     
     # Assert correlation > 0.99
     corr = np.corrcoef(y_pred_ns, y_pred_bs)[0, 1]
-    assert corr > 0.99
+    assert corr > 0.999
     
     # Assert extrapolation is reasonably close
     # Since both use linear extrapolation, they should be somewhat close, 
     # but the slopes at boundaries might differ slightly due to different penalty matrices.
-    assert mse_extra < 0.5 
+    assert mse_extra < 1e-6
 
 if __name__ == "__main__":
     test_compare_bspline_natural_spline(100, False, False)
