@@ -139,19 +139,16 @@ Eigen::MatrixXd BSplineFitter::get_Omega() {
 }
 
 /**
- * Fits the B-spline model by solving the penalized least squares problem.
+ * Constructs the linear system for the B-spline model.
  * 
  * The problem is: min ||y - N*alpha||^2 + lambda * alpha^T * Omega * alpha
  * Normal equations: (N^T W N + lambda * Omega) * alpha = N^T W y
  * 
- * This system is banded. The implementation uses LAPACK's 'dpbsv' (Symmetric Positive Definite Banded Solver)
- * for efficiency.
- * 
- * Additionally, it enforces natural boundary conditions (second derivative zero at endpoints)
- * by modifying the linear system (eliminating coefficients via constraints).
+ * Returns the banded matrix AB and the RHS vector b, after applying natural boundary conditions.
+ * The matrix AB is in lower banded storage format (row i stores the i-th subdiagonal).
  */
-void BSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
-    int n = n_basis_, kd = order_ - 1, ldab = kd + 1;
+std::pair<Eigen::MatrixXd, Eigen::VectorXd> BSplineFitter::compute_system(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
+    int n = n_basis_, kd = order_ - 1;
     Eigen::MatrixXd AB = AB_template_ + lamval * Omega_band_; Eigen::VectorXd b = Eigen::VectorXd::Zero(n), b_v(order_); int s_i;
     for(int i=0; i<x_.size(); ++i) {
         bspline::eval_bspline_basis(x_[i], order_, knots_, s_i, b_v, 0);
@@ -175,15 +172,31 @@ void BSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamva
     AB(0, n-2) = an22 + 2*we1*an12 + we1*we1*an11; AB(1, n-3) = an23 + we1*an13 + we2*an12 + we1*we2*an11; AB(0, n-3) = an33 + 2*we2*an13 + we2*we2*an11;
     if (kd >= 3) { AB(2, n-4) = an24 + we1*an14; AB(1, n-4) = an34 + we2*an14; }
     b[n-2] += we1 * b[n-1]; b[n-3] += we2 * b[n-1];
+
+    return {AB, b};
+}
+
+void BSplineFitter::set_solution(const Eigen::Ref<const Eigen::VectorXd>& sol) {
+    int n = n_basis_, s_i;
+    if (sol.size() != n - 2) throw std::runtime_error("Solution size mismatch. Expected " + std::to_string(n-2) + ", got " + std::to_string(sol.size()));
     
-    int n_r = n - 2, nrhs = 1, info = 0; char u_c = 'L'; dpbsv_(&u_c, &n_r, &kd, &nrhs, AB.data() + ldab * 1, &ldab, b.data() + 1, &n, &info);
-    if (info > 0) {
-        std::cerr << "dpbsv failed with info: " << info << std::endl;
-        Eigen::MatrixXd Af = Eigen::MatrixXd::Zero(n_r, n_r);
-        for (int j = 0; j < n_r; ++j) { for (int r = 0; r <= kd; ++r) { if (j + r < n_r) { double v = AB(r, j + 1); Af(j + r, j) = v; Af(j, j + r) = v; } } }
-        Eigen::LDLT<Eigen::MatrixXd> sol; sol.compute(Af); b.segment(1, n_r) = sol.solve(b.segment(1, n_r));
-    }
-    coeffs_ = b; coeffs_[0] = ws1 * coeffs_[1] + ws2 * coeffs_[2]; coeffs_[n-1] = we1 * coeffs_[n-2] + we2 * coeffs_[n-3];
+    coeffs_ = Eigen::VectorXd::Zero(n);
+    coeffs_.segment(1, n - 2) = sol;
+
+    // Recompute ws1, ws2, we1, we2 to reconstruct boundaries
+    // This duplicates some logic but avoids storing state across calls
+    Eigen::VectorXd d2_v(order_); 
+    bspline::eval_bspline_basis(knots_[order_-1], order_, knots_, s_i, d2_v, 2);
+    double v0 = d2_v[0], v1 = d2_v[1], v2 = d2_v[2];
+    double ws1 = -v1 / v0, ws2 = -v2 / v0;
+
+    bspline::eval_bspline_basis(knots_[knots_.size() - order_], order_, knots_, s_i, d2_v, 2);
+    int iN1 = n-1-s_i, iN2 = n-2-s_i, iN3 = n-3-s_i;
+    double u0 = d2_v[iN1], u1 = d2_v[iN2], u2 = d2_v[iN3];
+    double we1 = -u1 / u0, we2 = -u2 / u0;
+
+    coeffs_[0] = ws1 * coeffs_[1] + ws2 * coeffs_[2]; 
+    coeffs_[n-1] = we1 * coeffs_[n-2] + we2 * coeffs_[n-3];
 }
 
 Eigen::VectorXd BSplineFitter::predict(const Eigen::Ref<const Eigen::VectorXd>& x_n, int deriv) {

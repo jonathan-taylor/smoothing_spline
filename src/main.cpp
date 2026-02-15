@@ -39,7 +39,8 @@ PYBIND11_MODULE(_spline_extension, m) {
 
     py::class_<BSplineFitter>(m, "BSplineFitter")
         .def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, py::object, int>())
-        .def("fit", &BSplineFitter::fit)
+        .def("compute_system", &BSplineFitter::compute_system)
+        .def("set_solution", &BSplineFitter::set_solution)
         .def("predict", &BSplineFitter::predict)
         .def("get_NTWN", &BSplineFitter::get_NTWN)
         .def("get_Omega", &BSplineFitter::get_Omega)

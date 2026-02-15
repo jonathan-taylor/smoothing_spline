@@ -20,6 +20,7 @@ public:
     Eigen::VectorXd get_knots();
     Eigen::MatrixXd get_NTWN();
     Eigen::MatrixXd get_Omega();
-    void fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval);
+    std::pair<Eigen::MatrixXd, Eigen::VectorXd> compute_system(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval);
+    void set_solution(const Eigen::Ref<const Eigen::VectorXd>& sol);
     Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_n, int deriv=0);
 };

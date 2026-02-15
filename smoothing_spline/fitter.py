@@ -118,8 +118,8 @@ class SplineFitter:
             if is_reinsch_compatible:
                 self.engine = 'reinsch'
             else:
-                # Default fallback, could favor natural or bspline depending on n_knots
-                self.engine = 'natural' 
+                # Default fallback, should go to bspline
+                self.engine = 'bspline' 
 
         if self.engine == 'reinsch':
             if not is_reinsch_compatible:
@@ -166,8 +166,6 @@ class SplineFitter:
              except RuntimeError as e:
                  raise RuntimeError(f"C++ solver failed: {e}")
         
-        raise RuntimeError("C++ extension required for finding lambda from DF.")
-
     def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-10, 10)):
         """
         Find optimal lambda using GCV and fit the model using C++.
@@ -230,7 +228,23 @@ class SplineFitter:
              
              self._cpp_fitter.fit(y_eff, lam_scaled)
         else:
-             self._cpp_fitter.fit(y_arr, lam_scaled)
+             if self.engine == 'bspline':
+                 from scipy.linalg import solveh_banded
+                 AB, b = self._cpp_fitter.compute_system(y_arr, lam_scaled)
+                 # AB is (kd+1, n) in lower banded format.
+                 # The system to solve is for indices 1 to n-2.
+                 # solveh_banded expects (l+1, M).
+                 # We pass the columns 1 to n-2 (inclusive, so 1:n-1 in python slice).
+                 # b is also sliced.
+                 n = b.shape[0]
+                 # slice columns
+                 ab_sub = AB[:, 1:n-1]
+                 b_sub = b[1:n-1]
+                 
+                 sol = solveh_banded(ab_sub, b_sub, lower=True)
+                 self._cpp_fitter.set_solution(sol)
+             else:
+                 self._cpp_fitter.fit(y_arr, lam_scaled)
 
         # Compute intercept and coef (linear part)
         # This is strictly valid for natural spline. 
