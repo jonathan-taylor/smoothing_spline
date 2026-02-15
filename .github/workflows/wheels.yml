@@ -24,8 +24,8 @@ jobs:
           CIBW_SKIP: pp* # Skip PyPy
           CIBW_TEST_REQUIRES: pytest scipy
           CIBW_BEFORE_TEST_LINUX: "sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && yum install -y openblas-devel"
-          CIBW_TEST_COMMAND: cd {project}/tests && pytest .
-          CIBW_TEST_COMMAND_WINDOWS: cd /d {project}\tests && pytest .
+          CIBW_TEST_COMMAND: "cd /tmp && pytest {project}/tests"
+          CIBW_TEST_COMMAND_WINDOWS: "cd /d C:\\Users\\runneradmin\\AppData\\Local\\Temp && pytest {project}\\tests"
 
       - uses: actions/upload-artifact@v4
         with:
