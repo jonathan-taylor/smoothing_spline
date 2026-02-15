@@ -6,13 +6,8 @@ from scipy.sparse import linalg as splinalg
 from smoothing_spline.fitter import SplineFitter
 from tests.spline_fitter import SplineFitter as SplineFitterPy
 
-try:
-    from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
-    CPP_AVAILABLE = True
-except ImportError:
-    CPP_AVAILABLE = False
+from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_fitter_integration():
     rng = np.random.default_rng(99)
     x = np.sort(rng.uniform(0, 10, 50))
@@ -60,7 +55,6 @@ def test_cpp_fitter_integration():
     
     np.testing.assert_allclose(cpp_alpha, py_alpha, atol=1e-5)
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_fitter_weights():
     rng = np.random.default_rng(100)
     x = np.sort(rng.uniform(0, 10, 50))
@@ -90,7 +84,6 @@ def test_cpp_fitter_weights():
     
     np.testing.assert_allclose(cpp_alpha, py_alpha, atol=1e-5)
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_df():
     rng = np.random.default_rng(101)
     x = np.sort(rng.uniform(0, 10, 50))
@@ -114,7 +107,6 @@ def test_cpp_df():
     
     np.testing.assert_allclose(cpp_df, py_df, atol=1e-5)
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_prediction():
     # Helper already imports SplineFitter as SplineFitterPy
     rng = np.random.default_rng(102)

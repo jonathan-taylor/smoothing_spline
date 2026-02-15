@@ -1,15 +1,10 @@
 import numpy as np
 import pytest
 from scipy.interpolate import CubicSpline
-try:
-    from smoothing_spline._spline_extension import compute_natural_spline_basis
-    CPP_AVAILABLE = True
-except ImportError:
-    CPP_AVAILABLE = False
+from smoothing_spline._spline_extension import compute_natural_spline_basis
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_basis_matches_scipy():
-    assert CPP_AVAILABLE
+
     rng = np.random.default_rng(42)
     # Generate random data
     x = np.sort(rng.uniform(0, 10, 100))
@@ -24,7 +19,6 @@ def test_cpp_basis_matches_scipy():
     
     np.testing.assert_allclose(cpp_N, expected_N, atol=1e-8, rtol=1e-8)
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_basis_linear_extrapolation():
     # Test linear extrapolation behavior
     knots = np.array([0., 1., 2.])
@@ -54,7 +48,6 @@ def test_cpp_basis_linear_extrapolation():
     expected_right = cpp_boundary[3] + slope_right * (1.0)
     np.testing.assert_allclose(cpp_extrap[1], expected_right, atol=1e-4)
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_basis_random_knots_extrapolation():
     rng = np.random.default_rng(123)
     knots = np.sort(rng.uniform(0, 10, 15))

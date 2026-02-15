@@ -4,13 +4,8 @@ import pytest
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
 
-try:
-    from smoothing_spline._spline_extension import compute_penalty_matrix
-    CPP_AVAILABLE = True
-except ImportError:
-    CPP_AVAILABLE = False
+from smoothing_spline._spline_extension import compute_penalty_matrix
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_penalty_matches_scipy():
     rng = np.random.default_rng(55)
     knots = np.sort(rng.uniform(0, 10, 15))

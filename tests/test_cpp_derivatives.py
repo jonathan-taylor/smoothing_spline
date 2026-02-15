@@ -3,13 +3,8 @@ import numpy as np
 import pytest
 from scipy.interpolate import CubicSpline
 
-try:
-    from smoothing_spline._spline_extension import compute_natural_spline_basis
-    CPP_AVAILABLE = True
-except ImportError:
-    CPP_AVAILABLE = False
+from smoothing_spline._spline_extension import compute_natural_spline_basis
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_basis_derivatives():
     rng = np.random.default_rng(300)
     x = np.sort(rng.uniform(0, 10, 50))
@@ -33,7 +28,6 @@ def test_cpp_basis_derivatives():
     scipy_2 = cs(x, nu=2)
     np.testing.assert_allclose(cpp_2, scipy_2, atol=1e-8)
 
-@pytest.mark.skipif(not CPP_AVAILABLE, reason="C++ extension not built")
 def test_cpp_basis_derivatives_extrapolation():
     # Linear extrapolation means:
     # 1st derivative constant outside

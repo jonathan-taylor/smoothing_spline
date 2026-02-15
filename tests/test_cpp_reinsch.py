@@ -3,13 +3,8 @@ import numpy as np
 import pytest
 from smoothing_spline.fitter import SplineFitter
 
-try:
-    from smoothing_spline._spline_extension import SplineFitterReinschCpp
-    CPP_REINSCH_AVAILABLE = True
-except ImportError:
-    CPP_REINSCH_AVAILABLE = False
+from smoothing_spline._spline_extension import SplineFitterReinschCpp
 
-@pytest.mark.skipif(not CPP_REINSCH_AVAILABLE, reason="C++ extension not built")
 def test_reinsch_fitter_exact_fit():
     rng = np.random.default_rng(200)
     x = np.sort(rng.uniform(0, 10, 50))
@@ -42,7 +37,6 @@ def test_reinsch_fitter_exact_fit():
     
     np.testing.assert_allclose(reinsch_pred, basis_pred, atol=1e-5)
 
-@pytest.mark.skipif(not CPP_REINSCH_AVAILABLE, reason="C++ extension not built")
 def test_reinsch_df():
     rng = np.random.default_rng(201)
     x = np.sort(rng.uniform(0, 10, 50))
@@ -68,7 +62,6 @@ def test_reinsch_df():
     
     np.testing.assert_allclose(reinsch_df, basis_df, atol=1e-5)
 
-@pytest.mark.skipif(not CPP_REINSCH_AVAILABLE, reason="C++ extension not built")
 def test_reinsch_gcv():
     rng = np.random.default_rng(202)
     x = np.sort(rng.uniform(0, 10, 50))

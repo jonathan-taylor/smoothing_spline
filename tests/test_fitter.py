@@ -12,24 +12,12 @@ try:
 except ImportError:
     R_ENABLED = False
 
-# Check if C++ extension is available for SplineFitter
-try:
-    from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
-    CPP_AVAILABLE = True
-except ImportError:
-    CPP_AVAILABLE = False
+from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
 
 # Create a fixture to parametrize tests over both implementations
-@pytest.fixture(params=["cpp"])
+@pytest.fixture()
 def fitter_cls(request):
-    if request.param == "python":
-        return SplineFitterPy
-    elif request.param == "cpp":
-        if not CPP_AVAILABLE:
-            pytest.skip("C++ extension not available")
-        return SplineFitter
-    else:
-        raise ValueError("Invalid fitter type")
+    return SplineFitter
 
 def test_smoothing_spline_lamval(fitter_cls):
     rng = np.random.default_rng(0)
@@ -52,15 +40,12 @@ def test_smoothing_spline_df(fitter_cls):
     y_pred = fitter.predict(x)
     
     assert y_pred.shape == x.shape
-
-
 def test_reinsch_form_verification():
     """
     Verify the sparse Reinsch form EDF calculation against a dense matrix
     formulation and cross-check the SplineFitter estimator (C++).
     """
-    if not CPP_AVAILABLE:
-        pytest.skip("C++ extension not available for main SplineFitter")
+
 
     rng = np.random.default_rng(0)
     x_small = np.array([0.0, 0.5, 1.2, 1.8, 2.5, 3.0, 3.8, 4.2, 5.0,
@@ -150,14 +135,12 @@ def test_natural_spline_extrapolation(fitter_cls):
 @pytest.mark.parametrize(
     "use_weights, has_duplicates, use_df",
     [(False, False, True), (True, False, True), (False, True, True), (True, True, True)]
-)
-def test_natural_spline_comparison_with_R(use_weights, has_duplicates, use_df):
+)def test_natural_spline_comparison_with_R(use_weights, has_duplicates, use_df):
     """
     Compare the output of NaturalSpline with R's smooth.spline,
     using all unique x values as knots.
     """
-    if not CPP_AVAILABLE:
-        pytest.skip("C++ extension required for main SplineFitter")
+
 
     rng = np.random.default_rng(10)
     x = rng.uniform(size=500) * 2 # np.linspace(0, 1, 500) * 2
@@ -198,13 +181,11 @@ def test_natural_spline_comparison_with_R(use_weights, has_duplicates, use_df):
     # Comparison
     np.testing.assert_allclose(islp_pred, r_pred, rtol=1e-3, atol=1e-3)
     np.testing.assert_allclose(islp_fitter.predict(x_pred_new), r_pred_new, rtol=1e-3, atol=1e-3)
-
 def test_solve_gcv(fitter_cls):
     """
     Test the solve_gcv method of SplineFitter.
     """
-    if fitter_cls == SplineFitterPy:
-        pytest.skip("GCV not implemented in Pure Python fitter")
+
         
     rng = np.random.default_rng(42)
     x = np.linspace(0, 10, 100)
