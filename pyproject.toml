@@ -22,14 +22,13 @@ dependencies = [
 dev = [
     "pytest",
     "rpy2",
-    "scipy"
+    "scipy",
 ]
 doc = [
     "myst-parser",
     "jupyter-book",
     "pandas",
     "matplotlib",
-    "ISLP",
     "rpy2"
 ]
 
