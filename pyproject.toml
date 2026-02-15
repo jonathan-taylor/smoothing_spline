@@ -26,14 +26,10 @@ dev = [
 ]
 doc = [
     "myst-parser",
-    "sphinx",
-    "nbsphinx",
-    "ipython",
-    "ipykernel",
+    "jupyter-book",
     "pandas",
     "matplotlib",
     "ISLP",
-    "jupytext",
     "rpy2"
 ]
 

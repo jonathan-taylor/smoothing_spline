@@ -37,8 +37,7 @@ jobs:
 
       - name: Build docs
         run: |
-          cd docs
-          sphinx-build -b html . _build/html
+          jupyter-book build docs
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'

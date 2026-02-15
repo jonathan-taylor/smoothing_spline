@@ -1,0 +1,22 @@
+version: 1
+project:
+  title: Smoothing Spline
+  authors:
+    - name: Jonathan Taylor
+  github: executablebooks/jupyter-book
+  bibliography:
+    - references.bib
+  exports:
+    - format: pdf
+      template: plain_latex_book
+      output: exports/book.pdf
+  toc:
+    - file: index.md
+    - file: theory.md
+    - file: compare_R.md
+    - file: compare_cpp.md
+    - file: compare_scipy.md
+site:
+  options:
+    folders: true
+  template: book-theme

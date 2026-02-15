@@ -12,7 +12,7 @@ $$
 
 where $\lambda \ge 0$ is a smoothing parameter.
 - $\lambda = 0$: $f$ becomes an interpolating spline (passes through every point).
-- $\lambda 	o \infty$: $f$ approaches the linear least squares fit.
+- $\lambda \to \infty$: $f$ approaches the linear least squares fit.
 
 ### The Solution: Natural Cubic Spline
 
@@ -24,13 +24,13 @@ A natural cubic spline is a piecewise cubic polynomial that is continuous up to 
 
 Since the solution is a linear combination of basis functions, we can write:
 $$
-f(x) = \sum_{j=1}^N 	heta_j N_j(x)
+f(x) = \sum_{j=1}^N \theta_j N_j(x)
 $$
 where $N_j(x)$ are the natural cubic spline basis functions.
 
 The optimization problem reduces to:
 $$
-\min_{	heta} (y - N	heta)^T (y - N	heta) + \lambda 	heta^T \Omega_N 	heta
+\min_{ \theta} (y - N \theta)^T (y - N \theta) + \lambda \theta^T \Omega_N \theta
 $$
 
 where:
@@ -46,14 +46,14 @@ $$
 
 There are two primary ways to compute the solution.
 
-#### A. The Basis Form (Used in this Package)
+#### A. The Basis Form (Used in this Package and for $K=N$)
 We explicitly construct the basis matrix $N$ and the penalty matrix $\Omega$.
 - We use the property that a natural cubic spline is determined by its values and second derivatives at the knots.
 - Our C++ implementation constructs $N$ efficiently by solving the tridiagonal system that relates second derivatives to values.
-- We then solve the dense linear system $(N^T N + \lambda \Omega)	heta = N^T y$.
+- We then solve the dense linear system $(N^T N + \lambda \Omega)\theta = N^T y$.
 
 **Why Basis Form?**
-- Allows for **Regression Splines**: We can choose fewer knots than data points ($K < N$). The math remains identical, but the matrices are smaller ($K 	imes K$ instead of $N 	imes N$).
+- Allows for **Regression Splines**: We can choose fewer knots than data points ($K < N$). The math remains identical, but the matrices are smaller ($K 	\times K$ instead of $N \times N$).
 - Easier to extend to weighted least squares or other loss functions.
 
 #### B. The Reinsch Form (Used in R's `smooth.spline`)
@@ -62,8 +62,34 @@ $$
 \hat{\mathbf{f}} = (I + \lambda K)^{-1} y
 $$
 where $K = Q R^{-1} Q^T$.
-- $Q$ is an $N 	imes (N-2)$ tridiagonal matrix of second differences ($1/h_i$).
-- $R$ is an $(N-2) 	imes (N-2)$ tridiagonal matrix ($h_i$).
+- $Q$ is an $N \times (N-2)$ tridiagonal matrix of second differences.
+- $R$ is an $(N-2) \times (N-2)$ tridiagonal matrix.
+
+These matrices can be constructed in Python as follows:
+```python
+import numpy as np
+from scipy import sparse
+
+def get_qr_matrices(knots):
+    n_k = len(knots)
+    hk = np.diff(knots)
+    inv_hk = 1.0 / hk
+    
+    # R is a symmetric tridiagonal matrix
+    R_k = sparse.diags(
+        [hk[1:-1] / 6.0, (hk[:-1] + hk[1:]) / 3.0, hk[1:-1] / 6.0],
+        [-1, 0, 1],
+        shape=(n_k - 2, n_k - 2),
+    )
+    
+    # Q is a tridiagonal matrix with 3 diagonals
+    Q_k = sparse.diags(
+        [inv_hk[:-1], -inv_hk[:-1] - inv_hk[1:], inv_hk[1:]],
+        [0, -1, -2],
+        shape=(n_k, n_k - 2),
+    )
+    return Q_k, R_k
+```
 
 This allows solving the system in $O(N)$ time using banded solvers, making it extremely fast for large $N$.
 
@@ -75,7 +101,7 @@ While we use the basis form, our construction of $\Omega$ utilizes the exact sam
 The smoothing parameter $\lambda$ is abstract. A more intuitive measure of model complexity is the **effective degrees of freedom ($df$)**.
 
 $$
-df(\lambda) = 	ext{trace}(\mathbf{S}_\lambda)
+df(\lambda) = \text{trace}(\mathbf{S}_\lambda)
 $$
 
 where $\mathbf{S}_\lambda$ is the smoother matrix such that $\hat{y} = \mathbf{S}_\lambda y$.
@@ -85,8 +111,8 @@ $$
 $$
 
 The relationship between $df$ and $\lambda$ is monotonic.
-- $df 	o 2$ as $\lambda 	o \infty$ (Linear fit).
-- $df 	o N$ as $\lambda 	o 0$ (Interpolation).
+- $df \to 2$ as $\lambda \to \infty$ (Linear fit).
+- $df  \to N$ as $\lambda \to 0$ (Interpolation).
 
 Our package allows specifying `df` directly. We use a root-finding algorithm (Brent's method) to find the unique $\lambda$ that yields the requested $df$.
 
@@ -98,9 +124,9 @@ Our package allows specifying `df` directly. We use a root-finding algorithm (Br
 | **Knots** | All unique $x$ (default) or $nknots$ | All unique $x$ or specified `n_knots` |
 | **Input $\lambda$** | Via `spar` or `lambda` | Via `lamval` |
 | **Input $df$** | Supported | Supported (via root finding) |
-| **Automatic Tuning** | GCV / CV | **Not yet implemented** |
+| **Automatic Tuning** | GCV / CV | GCV |
 | **Weights** | Supported | Supported |
-| **Derivatives** | Built-in | **Not yet exposed** (Backend supports it) |
+| **Derivatives** | Built-in | Exposed via `predict(deriv=...)` |
 | **Extrapolation** | Linear (via `predict`) | Linear (explicitly handled) |
 
 ### Key Differences

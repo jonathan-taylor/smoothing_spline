@@ -194,20 +194,26 @@ class SplineFitter:
         self.intercept_ = beta[1]
         self.coef_ = beta[0]
 
-    def predict(self, x):
+    def predict(self, x, deriv=0):
         """
         Predict the response for a new set of predictor variables using C++ basis evaluation.
         Parameters
         ----------
         x : np.ndarray
             The predictor variables.
+        deriv : int, optional
+            The order of the derivative to compute (default is 0).
         Returns
         -------
         np.ndarray
-            The predicted response.
+            The predicted response or its derivative.
         """
         x_scaled = (x - self.x_min_) / self.x_scale_
-        return self._cpp_fitter.predict(x_scaled)
+        
+        # Scale the derivative by the chain rule
+        scale_factor = 1.0 / (self.x_scale_ ** deriv)
+        
+        return self._cpp_fitter.predict(x_scaled, deriv) * scale_factor
 
     @property
     def nonlinear_(self):
