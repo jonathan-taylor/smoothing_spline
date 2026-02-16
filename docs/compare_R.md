@@ -211,30 +211,48 @@ Finally, we compare the speed of both implementations on a synthetic dataset wit
 
 ```{code-cell} ipython3
 # Synthetic data
+df = 50
 n_syn = 1000
 rng = np.random.default_rng(0)
 x_syn = np.sort(rng.uniform(0, 10, n_syn))
 y_syn = np.sin(x_syn) + rng.normal(0, 0.1, n_syn)
-
+x_plot = np.linspace(x_syn.min()-2, x_syn.max()+2, 200)
+spline = SplineFitter(x=x_syn, df=df)
+spline.fit(y_syn)
+y_plot_py = spline.predict(x_plot)
 # Python Timing (using all unique x as knots)
 print(f"Python Timing (n={n_syn}, all knots):")
-%timeit SplineFitter(x=x_syn, df=10).fit(y_syn)
+%timeit SplineFitter(x=x_syn, df=df).fit(y_syn)
 ```
 
 ```{code-cell} ipython3
-%%R -i x_syn -i y_syn
+%%R -i x_syn -i y_syn -i x_plot -o y_plot_R -i df
 library(microbenchmark)
 cat(sprintf("R Timing (n=%d):\n", length(x_syn)))
 
 # Fit once to inspect knots
-fit_r_syn <- smooth.spline(x_syn, y_syn, df=10, all.knots=TRUE)
+fit_r_syn <- smooth.spline(x_syn, y_syn, df=df, all.knots=TRUE)
 n_knots_r <- fit_r_syn$fit$nk
+y_plot_R = predict(fit_r_syn, x_plot)$y
 cat(sprintf("Number of knots used by R: %d\n", n_knots_r))
 
 microbenchmark(
-  smooth.spline(x_syn, y_syn, df=10),
+  smooth.spline(x_syn, y_syn, df=df),
   times=100
 )
+```
+
+```{code-cell} ipython3
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.scatter(x_syn, y_syn, 
+            s=1, c='lightgray', alpha=0.5, label='Data')
+ax.plot(x_plot, y_plot_py, 'b-', lw=3, label='Python (smoothing_spline)', alpha=0.8)
+ax.plot(x_plot, y_plot_R, 'r--', lw=3, label='R (smooth.spline)', alpha=0.8)
+ax.set_xlabel("Hour")
+ax.set_ylabel("Number of Bikers")
+ax.set_title(f"Comparison of Smoothing Splines (df={df})")
+ax.legend()
+plt.show()
 ```
 
 ## Limited knots
@@ -252,16 +270,20 @@ x_syn = np.sort(rng.uniform(0, 10, n_syn))
 y_syn = np.sin(x_syn) + rng.normal(0, 0.1, n_syn)
 n_knots_reduced = 1000 # Similar to R's behavior
 print(f"Python Timing (n={n_syn}, n_knots={n_knots_reduced}):")
+spline = SplineFitter(x=x_syn, lamval=1e-3, n_knots=n_knots_reduced)
+spline.fit(y_syn)
+y_plot_py = spline.predict(x_plot)
 %timeit SplineFitter(x=x_syn, lamval=1e-3, n_knots=n_knots_reduced).fit(y_syn)
 ```
 
 ```{code-cell} ipython3
-%%R -i x_syn -i y_syn -i n_knots_reduced
+%%R -i x_syn -i y_syn -i n_knots_reduced -o y_plot_R
 library(microbenchmark)
 cat(sprintf("R Timing (n=%d):\n", length(x_syn)))
 
 # Fit once to inspect knots
 fit_r_syn <- smooth.spline(x_syn, y_syn, df=10, nknots=n_knots_reduced)
+y_plot_R = predict(fit_r_syn, x_plot)$y
 n_knots_r <- fit_r_syn$fit$nk
 cat(sprintf("Number of knots used by R: %d\n", n_knots_r))
 
@@ -269,6 +291,19 @@ microbenchmark(
   smooth.spline(x_syn, y_syn, df=10),
   times=100
 )
+```
+
+```{code-cell} ipython3
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.scatter(x_syn, y_syn, 
+            s=1, c='lightgray', alpha=0.5, label='Data')
+ax.plot(x_plot, y_plot_py, 'b-', lw=3, label='Python (smoothing_spline)', alpha=0.8)
+ax.plot(x_plot, y_plot_R, 'r--', lw=3, label='R (smooth.spline)', alpha=0.8)
+ax.set_xlabel("Hour")
+ax.set_ylabel("Number of Bikers")
+ax.set_title(f"Comparison of Smoothing Splines (df={df})")
+ax.legend()
+plt.show()
 ```
 
 ## Performance Note

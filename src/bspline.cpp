@@ -163,21 +163,70 @@ void BSplineFitter::set_solution(const Eigen::Ref<const Eigen::VectorXd>& sol) {
 
 Eigen::VectorXd BSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
     auto system = compute_system(y, lamval);
-    Eigen::MatrixXd AB = system.first;
+    Eigen::MatrixXd AB = system.first; // This is banded (n, kd+1)
     Eigen::VectorXd b = system.second;
-    int n = n_basis_, kd = order_ - 1, ldab = kd + 1;
-    int n_r = n - 2, nrhs = 1, info = 0; char u_c = 'L';
+    int n = n_basis_, kd = order_ - 1;
     
-    dpbsv_(&u_c, &n_r, &kd, &nrhs, AB.data() + ldab * 1, &ldab, b.data() + 1, &n, &info);
+    // We need to solve Ax = b where A is represented by AB (lower banded)
+    // We can reuse the banded_to_sparse helper if we modify it to handle the specific AB structure
+    // AB has n rows (but really only n-2 cols/rows are active for the solve)
+    // Wait, compute_system returns AB for the full system?
+    // In compute_system:
+    // AB(0, n-2) ...
+    // The system is size n.
+    // But we are solving for a reduced system or applying constraints?
+    // compute_system applies the boundary constraints to AB and b directly?
+    // No, look at compute_system:
+    // It updates AB entries corresponding to boundary constraints.
+    // But it returns the FULL matrix AB (size kd+1 x n).
+    // And b (size n).
+    // The previous dpbsv call solved a subsystem of size n-2 starting at index 1.
+    // dpbsv_(&u_c, &n_r, &kd, &nrhs, AB.data() + ldab * 1, &ldab, b.data() + 1, &n, &info);
+    // n_r = n - 2. pointer shift AB.data() + ldab * 1 (column 1). b.data() + 1 (element 1).
     
-    if (info > 0) {
-        std::cerr << "dpbsv failed with info: " << info << std::endl;
-        Eigen::MatrixXd Af = Eigen::MatrixXd::Zero(n_r, n_r);
-        for (int j = 0; j < n_r; ++j) { for (int r = 0; r <= kd; ++r) { if (j + r < n_r) { double v = AB(r, j + 1); Af(j + r, j) = v; Af(j, j + r) = v; } } }
-        Eigen::LDLT<Eigen::MatrixXd> sol; sol.compute(Af); b.segment(1, n_r) = sol.solve(b.segment(1, n_r));
+    // So we need to solve the subsystem A[1:n-1, 1:n-1] * x[1:n-1] = b[1:n-1].
+    // Let's extract this subsystem to sparse.
+    
+    int n_r = n - 2;
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.reserve(n_r * (kd + 1) * 2);
+    
+    // Iterate over columns j from 1 to n-2 (indices 0 to n_r-1 in the new system)
+    for (int j = 0; j < n_r; ++j) {
+        int original_col = j + 1;
+        for (int i = 0; i <= kd; ++i) {
+            // Check if element exists in the band
+            // AB stores lower band. AB(i, col) is element at (col+i, col)
+            // We want elements where both row and col are in range [1, n-2].
+            int original_row = original_col + i;
+            
+            if (original_row <= n - 2) {
+                double val = AB(i, original_col);
+                if (std::abs(val) > 1e-14) {
+                    triplets.push_back({original_row - 1, original_col - 1, val});
+                    if (original_row != original_col) {
+                        triplets.push_back({original_col - 1, original_row - 1, val});
+                    }
+                }
+            }
+        }
     }
     
-    set_solution(b.segment(1, n - 2));
+    Eigen::SparseMatrix<double> A_sparse(n_r, n_r);
+    A_sparse.setFromTriplets(triplets.begin(), triplets.end());
+    
+    Eigen::VectorXd b_sub = b.segment(1, n_r);
+    
+    Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
+    solver.compute(A_sparse);
+    if(solver.info() != Eigen::Success) {
+        // Fallback or error?
+        // For now, return zero coefficients or throw
+        throw std::runtime_error("Decomposition failed in BSplineFitter::fit");
+    }
+    
+    Eigen::VectorXd sol = solver.solve(b_sub);
+    set_solution(sol);
     return coeffs_;
 }
 

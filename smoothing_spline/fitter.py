@@ -1,5 +1,13 @@
 from dataclasses import dataclass, field
 import numpy as np
+from scipy.linalg import solveh_banded
+
+from _spline_extension import (
+    NaturalSplineFitter, 
+    ReinschFitter, 
+    BSplineFitter
+)
+        
 
 @dataclass
 class SplineFitter:
@@ -101,12 +109,7 @@ class SplineFitter:
         """
         Initialize the C++ extension fitter.
         """
-        from smoothing_spline._spline_extension import (
-            NaturalSplineFitter, 
-            ReinschFitter, 
-            BSplineFitter
-        )
-        
+
         # Decide which engine to use
         unique_x, inverse = np.unique(self.x_scaled_, return_inverse=True)
         is_reinsch_compatible = (
@@ -234,7 +237,6 @@ class SplineFitter:
              self._cpp_fitter.fit(y_eff, lam_scaled)
         else:
              if self.engine == 'bspline':
-                 from scipy.linalg import solveh_banded
                  AB, b = self._cpp_fitter.compute_system(y_arr, lam_scaled)
                  # AB is (kd+1, n) in lower banded format.
                  # The system to solve is for indices 1 to n-2.

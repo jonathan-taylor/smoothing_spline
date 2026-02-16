@@ -7,6 +7,4 @@ namespace utils {
 }
 
 extern "C" {
-    void dpbsv_(const char *uplo, const int *n, const int *kd, const int *nrhs,
-                double *ab, const int *ldab, double *b, const int *ldb, int *info);
 }
