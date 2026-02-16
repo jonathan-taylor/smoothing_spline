@@ -8,9 +8,9 @@ from scipy.optimize import brentq
 from ._spline_extension import (
     NaturalSplineFitter, 
     ReinschFitter, 
-    BSplineFitter
+    BSplineFitter,
+    trace_takahashi
 )
-from .takahashi_trace import trace_ratio_banded
 
 @dataclass
 class SplineFitter:
@@ -50,6 +50,9 @@ class SplineFitter:
     _cpp_fitter: object = field(init=False, default=None, repr=False)
     _use_reinsch: bool = field(init=False, default=False, repr=False)
     _inverse_indices: np.ndarray = field(init=False, default=None, repr=False)
+    _NTWN: np.ndarray = field(init=False, default=None, repr=False)
+    _Omega: np.ndarray = field(init=False, default=None, repr=False)
+    _cholesky_cache: dict = field(init=False, default_factory=dict, repr=False)
     
     # Scaling parameters
     x_min_: float = field(init=False, default=0.0)
@@ -144,6 +147,8 @@ class SplineFitter:
         elif self.engine == 'bspline':
             self._use_reinsch = False
             self._cpp_fitter = BSplineFitter(self.x_scaled_, self.knots_scaled_, self.w, self.order)
+            self._NTWN = None
+            self._Omega = None
             
         elif self.engine == 'natural':
             self._use_reinsch = False
@@ -162,24 +167,32 @@ class SplineFitter:
         lam_scaled = lamval / (self.x_scale_ ** 3)
         
         if self.engine == 'bspline':
-            if not hasattr(self, "_NTWN"):
+            if self._NTWN is None:
                 self._NTWN = self._cpp_fitter.compute_design()
+            if self._Omega is None:
+                self._Omega = self._cpp_fitter.compute_penalty()
+                
             NTWN = self._NTWN
-            Omega = self._cpp_fitter.compute_penalty()
+            Omega = self._Omega
             n = NTWN.shape[1]
+            
             NTWN_sub = NTWN[:, 1:n-1]
             Omega_sub = Omega[:, 1:n-1]
-            Omega_sub[-1] += eps * np.mean(Omega_sub[-1])
-            NTWN_sub[-1] += eps * np.mean(NTWN_sub[-1])
             
-            # Matrices are already in Upper Banded format
+            # Compute Cholesky explicitly and cache it
+            AB = lam_scaled * Omega_sub + NTWN_sub
             
-            # DF = Tr((NTWN + lam*Omega)^-1 * NTWN)
-            # trace_ratio_banded(A, B) = Tr((A+B)^-1 * B)
-            # So A = lam*Omega, B = NTWN
-            trace, _chol = trace_ratio_banded(lam_scaled * Omega_sub, NTWN_sub)
-            self._cholesky_cache[lam_scaled] = _chol
-            return trace
+            # Add small padding to ensure positive definiteness
+            if eps > 0:
+                AB[-1, :] += eps * (np.abs(AB[-1, :]).mean() + 1e-10)
+
+            try:
+                # lower=False for Upper Banded
+                U = cholesky_banded(AB, lower=False)
+                self._cholesky_cache[lam_scaled] = U
+                return trace_takahashi(U, NTWN_sub)
+            except np.linalg.LinAlgError:
+                return 0.0
         else:
             return self._cpp_fitter.compute_df(lam_scaled)
 
@@ -203,10 +216,10 @@ class SplineFitter:
             def objective(log_lam):
                 return self.compute_df(10**log_lam) - target_df
             
-            if True:
+            try:
                 log_lam_opt = brentq(objective, min_log + shift, max_log + shift)
                 return 10**log_lam_opt
-            else: # except ValueError:
+            except ValueError:
                 # Fallback or wider search?
                 return self._cpp_fitter.solve_for_df(target_df, min_log, max_log) * (self.x_scale_ ** 3)
         else:
@@ -258,11 +271,6 @@ class SplineFitter:
             if hasattr(self._cpp_fitter, "update_weights"):
                  self._cpp_fitter.update_weights(self.w)
             else:
-                 # BSpline might need full re-init if update_weights not exposed efficiently
-                 # or if implementation differs. Current BSpline C++ doesn't have update_weights exposed?
-                 # Let's check. SplineFitterBSpline constructor takes weights. 
-                 # C++ class doesn't have update_weights method exposed in my impl above.
-                 # So we need to re-create it for BSpline if weights change.
                  self._prepare_matrices()
         
         if self.lamval is None:
@@ -279,35 +287,33 @@ class SplineFitter:
              self._cpp_fitter.fit(y_eff, lam_scaled)
         else:
              if self.engine == 'bspline':
-                 NTWN = self._NTWN
-                 Omega = self._cpp_fitter.compute_penalty()
+                 if self._NTWN is None:
+                     self._NTWN = self._cpp_fitter.compute_design()
+                 if self._Omega is None:
+                     self._Omega = self._cpp_fitter.compute_penalty()
+                     
                  b = self._cpp_fitter.compute_rhs(y_arr)
-                 AB = NTWN + lam_scaled * Omega
-                 # AB is (kd+1, n) in UPPER banded format.
-                 # The system to solve is for indices 1 to n-2.
-                 # solveh_banded expects (l+1, M).
+                 
                  n = b.shape[0]
-                 # slice columns
-                 ab_sub = AB[:, 1:n-1]
                  b_sub = b[1:n-1]
                  
                  if lam_scaled in self._cholesky_cache:
-                     _chol = self._cholesky_cache[lam_scaled]
-                     sol = cho_solve_banded((_chol, False), b_sub)
+                     U = self._cholesky_cache[lam_scaled]
+                     sol = cho_solve_banded((U, False), b_sub)
                  else:
-                     sol = solveh_banded(ab_sub, b_sub)
+                     NTWN_sub = self._NTWN[:, 1:n-1]
+                     Omega_sub = self._Omega[:, 1:n-1]
+                     AB = lam_scaled * Omega_sub + NTWN_sub
+                     sol = solveh_banded(AB, b_sub, lower=False)
+                     
                  self._cpp_fitter.set_solution(sol)
              else:
                  self._cpp_fitter.fit(y_arr, lam_scaled)
 
         # Compute intercept and coef (linear part)
-        # This is strictly valid for natural spline. 
-        # For B-spline, "linear part" concept is slightly different but we can approximate or compute 
-        # if needed. The previous code did this for all.
         y_hat = self.predict(self.x)
         w_eff = self.w if self.w is not None else np.ones(len(self.x))
         
-        # Simple weighted linear regression on the fitted values
         X = np.vander(self.x, 2)
         Xw = X * w_eff[:, None]
         yw = y_hat * w_eff

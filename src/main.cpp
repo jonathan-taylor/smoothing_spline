@@ -3,10 +3,15 @@
 #include "natural_spline.h"
 #include "reinsch.h"
 #include "bspline.h"
+#include "utils.h"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(_spline_extension, m) {
+    m.def("trace_takahashi", &utils::trace_takahashi, py::arg("U_banded"), py::arg("B_banded"));
+    m.def("takahashi_upper", &utils::takahashi_upper, py::arg("U_banded"));
+    m.def("trace_product_banded", &utils::trace_product_banded, py::arg("Z_banded"), py::arg("B_banded"));
+
     py::class_<NaturalSplineFitter>(m, "NaturalSplineFitter")
         .def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, py::object>(),
              py::arg("x"), py::arg("knots"), py::arg("weights_obj") = py::none())

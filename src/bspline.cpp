@@ -135,27 +135,81 @@ Eigen::MatrixXd BSplineFitter::get_Omega() {
     return M;
 }
 
+// -----------------------------------------------------------------------------------------
+// Theory: Natural Boundary Conditions and the Projection Matrix P
+// -----------------------------------------------------------------------------------------
+// The B-spline basis functions B_1(x), ..., B_N(x) (where N = n_basis_) form a basis for 
+// cubic splines with the given knots. However, a "natural" cubic spline requires the 
+// second derivative to be zero at the boundary knots (x_min and x_max).
+//
+// The second derivative of a spline f(x) = sum(theta_j * B_j(x)) is:
+// f''(x) = sum(theta_j * B''_j(x))
+//
+// At the boundaries x_min and x_max, we require f''(x_min) = 0 and f''(x_max) = 0.
+// Due to the local support of B-splines, only the first few and last few basis functions 
+// are non-zero at the boundaries. Specifically, for cubic B-splines (order 4):
+// - At x_min (first knot), only B_1, B_2, B_3 have non-zero support (conceptually). 
+//   In our 0-indexed implementation: coeffs_[0], coeffs_[1], coeffs_[2].
+// - At x_max (last knot), only B_{N-2}, B_{N-1}, B_{N} (last 3) are active.
+//
+// The condition f''(x_min) = 0 implies a linear constraint on theta_0, theta_1, theta_2:
+// theta_0 * B''_0(x_min) + theta_1 * B''_1(x_min) + theta_2 * B''_2(x_min) = 0
+// theta_0 = - (theta_1 * B''_1(x_min) / B''_0(x_min)) - (theta_2 * B''_2(x_min) / B''_0(x_min))
+// theta_0 = ws1 * theta_1 + ws2 * theta_2
+//
+// Similarly at the trailing boundary:
+// theta_{N-1} = we1 * theta_{N-2} + we2 * theta_{N-3}
+//
+// These constraints reduce the dimension of the free parameters from N to N-2.
+// We can define a projection matrix P of size N x (N-2) that maps the reduced parameters 
+// (theta_1, ..., theta_{N-2}) back to the full parameter vector theta.
+//
+// The linear system for the reduced parameters gamma (size N-2) becomes:
+// (P^T * (N^T W N + lambda * Omega) * P) * gamma = P^T * N^T W y
+//
+// The `apply_constraints` function performs the operation M_reduced = P^T * M * P
+// in-place on the banded matrix M (representing N^T W N or Omega).
+// Because P is extremely sparse (identity plus corner modifications), this operation 
+// only affects the top-left (leading) and bottom-right (trailing) corners of the matrix.
+// -----------------------------------------------------------------------------------------
+
 void BSplineFitter::get_boundary_weights(double& ws1, double& ws2, double& we1, double& we2) {
     int s_i;
     Eigen::VectorXd d2_v(order_); 
     
-    // Leading boundary (Start)
+    // Evaluate second derivatives of basis functions at the first internal knot (Start)
+    // Note: knots_[order_-1] is the first knot where the spline actually starts.
     bspline::eval_bspline_basis(knots_[order_-1], order_, knots_, s_i, d2_v, 2);
     double v0 = d2_v[0], v1 = d2_v[1], v2 = d2_v[2]; 
     if (std::abs(v0) < 1e-12) throw std::runtime_error("Leading zero: v0=" + std::to_string(v0));
+    
+    // Solve for theta_0 in terms of theta_1 and theta_2
     ws1 = -v1 / v0; 
     ws2 = -v2 / v0;
 
-    // Trailing boundary (End)
+    // Evaluate at the last knot (End)
     bspline::eval_bspline_basis(knots_[knots_.size() - order_], order_, knots_, s_i, d2_v, 2);
     int iN1 = n_basis_-1-s_i, iN2 = n_basis_-2-s_i, iN3 = n_basis_-3-s_i;
     double u0 = d2_v[iN1], u1 = d2_v[iN2], u2 = d2_v[iN3]; 
     if (std::abs(u0) < 1e-12) throw std::runtime_error("Trailing zero: u0=" + std::to_string(u0));
+    
+    // Solve for theta_{N-1} in terms of theta_{N-2} and theta_{N-3}
     we1 = -u1 / u0; 
     we2 = -u2 / u0;
 }
 
 void BSplineFitter::apply_constraints(Eigen::MatrixXd& M) {
+    // This function computes P^T * M * P in-place.
+    // M is stored in Upper Banded format.
+    // P maps reduced indices 0..N-3 to full indices 0..N-1.
+    // Most of P is Identity (shifted). The interesting parts are the corners.
+    //
+    // The transformation linearly combines rows and columns at the boundaries.
+    // For the leading corner (affecting indices 0, 1, 2 of full matrix -> 0, 1 of reduced matrix):
+    // New A[0,0] corresponds to full A[1,1] + weights mixed from A[0,0], A[0,1], etc.
+    // Specifically, if we substitute theta_0 = ws1*theta_1 + ws2*theta_2 into the quadratic form theta^T A theta,
+    // and differentiate with respect to theta_1 and theta_2, we get the new matrix entries.
+    
     double ws1, ws2, we1, we2;
     get_boundary_weights(ws1, ws2, we1, we2);
     
@@ -175,44 +229,64 @@ void BSplineFitter::apply_constraints(Eigen::MatrixXd& M) {
         return M(kd - (j - i), j); 
     };
     
+    // Get original top-left 4x4 block elements involved in the constraint
     double a00 = get_M(0,0), a01 = get_M(1,0), a02 = get_M(2,0), a03 = get_M(3,0);
     double a11 = get_M(1,1), a12 = get_M(2,1), a13 = get_M(3,1);
     double a22 = get_M(2,2), a23 = get_M(3,2);
     
-    // A[1, 1]
+    // Update reduced matrix entries (indices shifted by -1 relative to full matrix where identity holds)
+    // Reduced index 0 corresponds to Full index 1.
+    // Reduced index 1 corresponds to Full index 2.
+    // The quadratic terms for theta_1 involve: A[1,1]*t1^2 + A[0,0]*(ws1*t1)^2 + 2*A[0,1]*t1*(ws1*t1) ...
+    
+    // A_reduced[0, 0] (Full 1,1)
     set_M(1, 1, a11 + 2*ws1*a01 + ws1*ws1*a00);
-    // A[1, 2]
+    // A_reduced[0, 1] (Full 1,2)
     set_M(1, 2, a12 + ws1*a02 + ws2*a01 + ws1*ws2*a00);
-    // A[2, 2]
+    // A_reduced[1, 1] (Full 2,2)
     set_M(2, 2, a22 + 2*ws2*a02 + ws2*ws2*a00);
     
     if (kd >= 3) { 
-        // A[1, 3] (Symmetric to A[3, 1])
+        // Interaction with further bands (Full index 3)
+        // A_reduced[0, 2] corresponds to Full[1, 3] + contribution from Full[0, 3] via theta_0
         set_M(1, 3, a13 + ws1*a03);
-        // A[2, 3] (Symmetric to A[3, 2])
+        // A_reduced[1, 2] corresponds to Full[2, 3] + contribution from Full[0, 3] via theta_0
         set_M(2, 3, a23 + ws2*a03);
     }
 
+    // Get original bottom-right block elements
     double an11 = get_M(n-1, n-1), an12 = get_M(n-1, n-2), an13 = get_M(n-1, n-3), an14 = get_M(n-1, n-4);
     double an22 = get_M(n-2, n-2), an23 = get_M(n-2, n-3), an24 = get_M(n-2, n-4);
     double an33 = get_M(n-3, n-3), an34 = get_M(n-3, n-4);
     
-    // A[n-2, n-2]
+    // Update reduced matrix entries at the end
+    // Reduced index N-3 corresponds to Full index N-2.
+    // Reduced index N-4 corresponds to Full index N-3.
+    
+    // A_reduced[N-3, N-3] (Full N-2, N-2)
     set_M(n-2, n-2, an22 + 2*we1*an12 + we1*we1*an11);
-    // A[n-2, n-3]
+    // A_reduced[N-3, N-4] (Full N-2, N-3)
     set_M(n-2, n-3, an23 + we1*an13 + we2*an12 + we1*we2*an11);
-    // A[n-3, n-3]
+    // A_reduced[N-4, N-4] (Full N-3, N-3)
     set_M(n-3, n-3, an33 + 2*we2*an13 + we2*we2*an11);
     
     if (kd >= 3) { 
-        // A[n-2, n-4]
+        // A_reduced[N-3, N-5] (Full N-2, N-4)
         set_M(n-2, n-4, an24 + we1*an14);
-        // A[n-3, n-4]
+        // A_reduced[N-4, N-5] (Full N-3, N-4)
         set_M(n-3, n-4, an34 + we2*an14);
     }
 }
 
 void BSplineFitter::apply_constraints(Eigen::VectorXd& v) {
+    // Computes P^T * v for a vector v.
+    // This maps the right-hand side vector from size N to N-2.
+    // v_reduced[0] = v[1] + ws1 * v[0]
+    // v_reduced[1] = v[2] + ws2 * v[0]
+    // ...
+    // v_reduced[N-3] = v[N-2] + we1 * v[N-1]
+    // v_reduced[N-4] = v[N-3] + we2 * v[N-1]
+    
     double ws1, ws2, we1, we2;
     get_boundary_weights(ws1, ws2, we1, we2);
     int n = n_basis_;

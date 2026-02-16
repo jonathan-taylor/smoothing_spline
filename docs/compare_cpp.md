@@ -55,7 +55,7 @@ def benchmark_fitters(ns, n_knots=None, engine='reinsch', python=True):
             fitter_py = SplineFitterPy(x, n_knots=n_knots, df=10)
             fitter_py.fit(y)
             results['py'].append(time.time() - start)
-        print(ns, n_knots, engine)
+
         try:
             start = time.time()
             # Explicitly request engine

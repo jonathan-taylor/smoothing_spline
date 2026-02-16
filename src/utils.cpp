@@ -180,4 +180,9 @@ namespace utils {
         return trace;
     }
 
+    double trace_takahashi(const Eigen::MatrixXd& U_banded, const Eigen::MatrixXd& B_banded) {
+        Eigen::MatrixXd Z = takahashi_upper(U_banded);
+        return trace_product_banded(Z, B_banded);
+    }
+
 }

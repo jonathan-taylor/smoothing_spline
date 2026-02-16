@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 from scipy.linalg import cholesky_banded, inv
-from smoothing_spline.takahashi_trace import takahashi_upper, trace_product_banded
+from .takahashi_trace import (takahashi_upper,
+                              trace_product_banded)
+from smoothing_spline._spline_extension import trace_takahashi as trace_takahashi_cpp
 
 def band_to_dense(ab, w, N):
     """Helper to expand banded storage to dense matrix for verification."""
@@ -51,7 +53,7 @@ def test_takahashi_trace():
 
     # Trace(Z * B)
     trace_fast = trace_product_banded(Z_band, B_band)
-
+    trace_cpp = trace_takahashi_cpp(U_factor, B_band)
     # ---------------------------------------------------------
     # SLOW REFERENCE METHOD (Dense)
     # ---------------------------------------------------------
@@ -70,7 +72,8 @@ def test_takahashi_trace():
     # COMPARISON
     # ---------------------------------------------------------
     
-    diff = abs(trace_fast - trace_dense)
-    
+    diff1 = abs(trace_fast - trace_dense)
+    diff2 = abs(trace_fast - trace_cpp)
     # Check for match
-    assert diff < 1e-9, f"Mismatch detected! Fast: {trace_fast}, Slow: {trace_dense}, Diff: {diff}"
+    assert diff1 < 1e-9, f"Mismatch detected! Fast: {trace_fast}, Slow: {trace_dense}, Diff: {diff1}"
+    assert diff2 < 1e-9, f"Mismatch detected! Fast: {trace_fast}, Cpp: {trace_cpp}, Diff: {diff2}"

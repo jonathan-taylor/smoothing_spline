@@ -10,6 +10,7 @@ namespace utils {
     // Matrices are in Upper Banded format (SciPy/LAPACK compatible)
     Eigen::MatrixXd takahashi_upper(const Eigen::MatrixXd& U_banded);
     double trace_product_banded(const Eigen::MatrixXd& Z_banded, const Eigen::MatrixXd& B_banded);
+    double trace_takahashi(const Eigen::MatrixXd& U_banded, const Eigen::MatrixXd& B_banded);
 }
 
 extern "C" {

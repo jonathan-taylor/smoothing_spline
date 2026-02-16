@@ -116,24 +116,24 @@ def trace_product_banded(Z_banded, B_banded):
 
     return trace
 
-def trace_ratio_banded(A_band, B_band):
-    """
-    Compute Tr((A+B)^{-1}B)
+# def trace_ratio_banded(A_band, B_band):
+#     """
+#     Compute Tr((A+B)^{-1}B)
 
-    """
+#     """
 
-    # Compute C = A + B
-    C_band = A_band + B_band
+#     # Compute C = A + B
+#     C_band = A_band + B_band
     
-    # Cholesky of C (Upper form)
-    # lower=False returns U where C = U.T @ U
-    U_factor = cholesky_banded(C_band, lower=False)
+#     # Cholesky of C (Upper form)
+#     # lower=False returns U where C = U.T @ U
+#     U_factor = cholesky_banded(C_band, lower=False)
     
-    # Takahashi Inverse (Get bands of C^-1)
-    Z_band = takahashi_upper(U_factor)
+#     # Takahashi Inverse (Get bands of C^-1)
+#     Z_band = takahashi_upper(U_factor)
     
-    # Trace(Z * B)
-    return trace_product_banded(Z_band, B_band), U_factor
+#     # Trace(Z * B)
+#     return trace_product_banded(Z_band, B_band), U_factor
 
 def band_to_dense(ab, w, N):
     """Helper to expand banded storage to dense matrix for verification."""
