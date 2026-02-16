@@ -64,7 +64,7 @@ We explicitly construct the basis matrix $N$ and the penalty matrix $\Omega$.
 - We use the property that a natural cubic spline is determined by its values and second derivatives at the knots.
 - Our C++ implementation constructs $N$ efficiently by solving the tridiagonal system that relates second derivatives to values.
 - We then solve the linear system $(N^T W N + \lambda \Omega)\theta = N^T W y$.
-- Use of this is not recommended as it is much slower. It was written as part of the development process.
+- **Use of this is not recommended as it is much slower.** It was written as part of the development process.
 
 +++
 
@@ -88,6 +88,7 @@ Uses the B-spline basis with compact support.
 - Constructs banded matrices for the normal equations $N^T W N$ and $\Omega_N$.
 - Solves using LAPACK's `dpbsv` via `scipy`. This is the only part `scipy` is used so direct calls to LAPACK could in theory be used.
 - Efficient for both $K=N$ and $K<N$.
+- Also allows regression splines.
 
 #### D. Automatic (`engine='auto'`)
 Uses Reinsch form if possible, else uses the B-Spline form.
