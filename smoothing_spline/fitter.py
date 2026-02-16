@@ -145,7 +145,7 @@ class SplineFitter:
         else:
             raise ValueError(f"Unknown engine: {self.engine}")
 
-    def _find_lamval_for_df(self, target_df):
+    def _find_lamval_for_df(self, target_df, log10_lam_bounds=(-20, 20)):
         """
         Finds the exact lambda value that yields the target degrees of freedom
         using the C++ implementation.
@@ -160,13 +160,18 @@ class SplineFitter:
              return 1e15 * (self.x_scale_ ** 3)
 
         if hasattr(self._cpp_fitter, "solve_for_df"):
+             # Adjust bounds for C++ which works on scaled lambda
+             shift = 3 * np.log10(self.x_scale_)
+             min_log = log10_lam_bounds[0] - shift
+             max_log = log10_lam_bounds[1] - shift
+             
              try:
-                 lam_scaled = self._cpp_fitter.solve_for_df(target_df)
+                 lam_scaled = self._cpp_fitter.solve_for_df(target_df, min_log, max_log)
                  return lam_scaled * (self.x_scale_ ** 3)
              except RuntimeError as e:
                  raise RuntimeError(f"C++ solver failed: {e}")
         
-    def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-10, 10)):
+    def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-20, 20)):
         """
         Find optimal lambda using GCV and fit the model using C++.
         """
