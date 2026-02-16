@@ -128,10 +128,9 @@ if (!require("microbenchmark", quietly = TRUE)) {
 }
 library(microbenchmark)
 # R Timing
-microbenchmark(
+summary(microbenchmark(
   smooth.spline(hr_numeric, bikers, df=10),
-  times=10
-)
+  times=10), unit='milliseconds')[,-1]
 ```
 
 ## Automatic Tuning with GCV
@@ -233,7 +232,6 @@ print(f"Python Timing (n={n_syn}, all knots):")
 
 ```{code-cell} ipython3
 %%R -i x_syn -i y_syn -i x_plot -o y_plot_R -i df
-library(microbenchmark)
 cat(sprintf("R Timing (n=%d):\n", length(x_syn)))
 
 # Fit once to inspect knots
@@ -242,10 +240,9 @@ n_knots_r <- fit_r_syn$fit$nk
 y_plot_R = predict(fit_r_syn, x_plot)$y
 cat(sprintf("Number of knots used by R: %d\n", n_knots_r))
 
-microbenchmark(
+summary(microbenchmark(
   smooth.spline(x_syn, y_syn, df=df, all.knots=TRUE),
-  times=100
-)
+  times=100), unit='milliseconds')[,-1]
 ```
 
 ```{code-cell} ipython3
@@ -288,7 +285,6 @@ SplineSmoother(x=x_syn, df=df, n_knots=n_knots_reduced).smooth(y_syn)
 
 ```{code-cell} ipython3
 %%R -i x_syn -i y_syn -i n_knots_reduced -o y_plot_R -i df
-library(microbenchmark)
 cat(sprintf("R Timing (n=%d):\n", length(x_syn)))
 
 # Fit once to inspect knots
@@ -297,10 +293,9 @@ y_plot_R = predict(fit_r_syn, x_plot)$y
 n_knots_r <- fit_r_syn$fit$nk
 cat(sprintf("Number of knots used by R: %d\n", n_knots_r))
 
-microbenchmark(
+summary(microbenchmark(
   smooth.spline(x_syn, y_syn, df=df, nknots=n_knots_reduced),
-  times=100
-)
+  times=100), unit='milliseconds')[,-1]
 ```
 
 ```{code-cell} ipython3
