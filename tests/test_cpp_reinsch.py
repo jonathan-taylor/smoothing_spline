@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from smoothing_spline.fitter import SplineFitter
 
-from smoothing_spline._spline_extension import SplineFitterReinschCpp
+from smoothing_spline._spline_extension import ReinschFitter
 
 def test_reinsch_fitter_exact_fit():
     rng = np.random.default_rng(200)
@@ -11,7 +11,7 @@ def test_reinsch_fitter_exact_fit():
     y = np.sin(x) + rng.normal(0, 0.1, 50)
     
     # Python SplineFitter (Basis form)
-    py_fitter = SplineFitter(x, knots=x)
+    py_fitter = SplineFitter(x, knots=x, engine='natural')
     py_fitter.fit(y)
     
     # Reinsch Fitter
@@ -20,7 +20,7 @@ def test_reinsch_fitter_exact_fit():
     x_min = py_fitter.x_min_
     x_scaled = (x - x_min) / scale
     
-    reinsch_fitter = SplineFitterReinschCpp(x_scaled, None)
+    reinsch_fitter = ReinschFitter(x_scaled, None)
     
     lamval = 0.5
     lam_scaled = lamval / scale**3
@@ -40,14 +40,14 @@ def test_reinsch_df():
     rng = np.random.default_rng(201)
     x = np.sort(rng.uniform(0, 10, 50))
     
-    py_fitter = SplineFitter(x, knots=x)
+    py_fitter = SplineFitter(x, knots=x, engine='natural')
     py_fitter._prepare_matrices()
     
     scale = py_fitter.x_scale_
     x_min = py_fitter.x_min_
     x_scaled = (x - x_min) / scale
     
-    reinsch_fitter = SplineFitterReinschCpp(x_scaled, None)
+    reinsch_fitter = ReinschFitter(x_scaled, None)
     
     lamval = 0.1
     lam_scaled = lamval / scale**3
@@ -66,14 +66,14 @@ def test_reinsch_gcv():
     x = np.sort(rng.uniform(0, 10, 50))
     y = np.sin(x) + rng.normal(0, 0.1, 50)
     
-    py_fitter = SplineFitter(x, knots=x)
+    py_fitter = SplineFitter(x, knots=x, engine='natural')
     py_fitter.fit(y)
     
     scale = py_fitter.x_scale_
     x_min = py_fitter.x_min_
     x_scaled = (x - x_min) / scale
     
-    reinsch_fitter = SplineFitterReinschCpp(x_scaled, None)
+    reinsch_fitter = ReinschFitter(x_scaled, None)
     
     lamval = 0.1
     lam_scaled = lamval / scale**3

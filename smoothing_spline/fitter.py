@@ -1,34 +1,79 @@
 from dataclasses import dataclass, field
 import numpy as np
+from scipy.linalg import (cholesky_banded,
+                          cho_solve_banded,
+                          solveh_banded)
+from scipy.optimize import brentq
+
+from ._spline_extension import (
+    NaturalSplineFitter, 
+    ReinschFitter, 
+    BSplineFitter,
+    trace_takahashi
+)
 
 @dataclass
 class SplineFitter:
     """
     SplineFitter implementation using C++ extension for performance.
+    
+    Parameters
+    ----------
+    x : np.ndarray
+        The predictor variable.
+    w : np.ndarray, optional
+        Weights for the observations.
+    lamval : float, optional
+        The smoothing parameter (lambda). If None, it will be estimated or set to 0.
+    df : float, optional
+        The target degrees of freedom. If provided, lambda will be solved to match this DF.
+    knots : np.ndarray, optional
+        The knots for the spline.
+    n_knots : int, optional
+        The number of knots to use if knots are not provided.
+    order : int, optional
+        The order of the B-spline (default is 4 for cubic B-splines). Only used if engine='bspline'.
+    engine : str, optional
+        The fitting engine to use: 'auto', 'natural', 'reinsch', or 'bspline'.
+        'auto' (default) attempts to pick the most efficient engine.
     """
 
     x: np.ndarray
     w: np.ndarray = None
     lamval: float = None
-    df: int = None
+    df: float = None
     knots: np.ndarray = None
     n_knots: int = None
+    order: int = 4
+    engine: str = 'auto'
+    
     _cpp_fitter: object = field(init=False, default=None, repr=False)
+    _use_reinsch: bool = field(init=False, default=False, repr=False)
+    _inverse_indices: np.ndarray = field(init=False, default=None, repr=False)
+    _NTWN: np.ndarray = field(init=False, default=None, repr=False)
+    _Omega: np.ndarray = field(init=False, default=None, repr=False)
+    _cholesky_cache: dict = field(init=False, default_factory=dict, repr=False)
+    
+    # Scaling parameters
+    x_min_: float = field(init=False, default=0.0)
+    x_scale_: float = field(init=False, default=1.0)
+    knots_scaled_: np.ndarray = field(init=False, default=None)
+    n_k_: int = field(init=False, default=0)
 
+    # Exposed attributes (populated after fit/init)
+    coef_: float = field(init=False, default=None)
+    intercept_: float = field(init=False, default=None)
 
     def __post_init__(self):
+        self._setup_scaling_and_knots()
         self._prepare_matrices()
+        
+        self._cholesky_cache = {}
         if self.df is not None:
             self.lamval = self._find_lamval_for_df(self.df)
         elif self.lamval is None:
             self.lamval = 0.0
-
-    def _prepare_matrices(self):
-        raise NotImplementedError
-
-    def _find_lamval_for_df(self, df):
-        raise NotImplementedError
-
+        
     def _setup_scaling_and_knots(self):
         """
         Compute the scaled values and knots required for both
@@ -40,7 +85,9 @@ class SplineFitter:
         n_knots = self.n_knots
         
         n = len(x)
-        if weights is None: weights = np.ones(n)
+        if weights is None: 
+            weights = np.ones(n)
+            self.w = None # Keep as None internally if originally None, but handle locally if needed
         
         if knots is None:
             if n_knots is not None:
@@ -62,67 +109,127 @@ class SplineFitter:
         self.x_min_ = x_min
         self.x_scale_ = scale
 
-        x_scaled = (x - x_min) / scale
-        knots_scaled = (knots - x_min) / scale
-        self.knots_scaled_ = knots_scaled
-        return x_scaled, knots_scaled
+        self.x_scaled_ = (x - x_min) / scale
+        self.knots_scaled_ = (knots - x_min) / scale
 
     def _prepare_matrices(self):
         """
         Initialize the C++ extension fitter.
         """
-        from smoothing_spline._spline_extension import SplineFitterCpp as _ExtSplineFitterCpp
-        from smoothing_spline._spline_extension import SplineFitterReinschCpp as _ExtSplineFitterReinschCpp
+
+        # Decide which engine to use
+        unique_x, inverse = np.unique(self.x_scaled_, return_inverse=True)
+        is_reinsch_compatible = (
+            len(self.knots_scaled_) == len(unique_x) and 
+            np.allclose(self.knots_scaled_, unique_x)
+        )
         
-        x_scaled, knots_scaled = self._setup_scaling_and_knots()
-        
-        # Check if we can use the efficient Reinsch algorithm (knots == unique(x))
-        # np.unique returns sorted unique elements
-        unique_x, inverse = np.unique(x_scaled, return_inverse=True)
-        
-        if len(knots_scaled) == len(unique_x) and np.allclose(knots_scaled, unique_x):
+        if self.engine == 'auto':
+            if is_reinsch_compatible:
+                self.engine = 'reinsch'
+            else:
+                # Default fallback, should go to bspline
+                self.engine = 'bspline' 
+
+        if self.engine == 'reinsch':
+            if not is_reinsch_compatible:
+                raise ValueError("Reinsch engine requires knots to be exactly the unique x values.")
+            
             self._use_reinsch = True
             self._inverse_indices = inverse
             
             # Aggregate weights for Reinsch
-            w_raw = self.w if self.w is not None else np.ones(len(x_scaled))
+            w_raw = self.w if self.w is not None else np.ones(len(self.x_scaled_))
             w_agg = np.bincount(inverse, weights=w_raw)
             
-            self._cpp_fitter = _ExtSplineFitterReinschCpp(knots_scaled, w_agg)
+            self._cpp_fitter = ReinschFitter(self.knots_scaled_, w_agg)
             
-            # For Reinsch, N and Omega are implicit or managed differently, but we expose properties if needed
-            # For now, we don't expose N_ and Omega_ for Reinsch path in python as they are not used
-        else:
+        elif self.engine == 'bspline':
             self._use_reinsch = False
-            self._cpp_fitter = _ExtSplineFitterCpp(x_scaled, knots_scaled, self.w)
-            self.N_ = self._cpp_fitter.get_N()
-            self.Omega_ = self._cpp_fitter.get_Omega()
-            if self.w is not None:
-                self.NTW_ = self.N_.T * self.w
-            else:
-                self.NTW_ = self.N_.T
+            self._cpp_fitter = BSplineFitter(self.x_scaled_, self.knots_scaled_, self.w, self.order)
+            self._NTWN = None
+            self._Omega = None
+            
+        elif self.engine == 'natural':
+            self._use_reinsch = False
+            self._cpp_fitter = NaturalSplineFitter(self.x_scaled_, self.knots_scaled_, self.w)
+            
+        else:
+            raise ValueError(f"Unknown engine: {self.engine}")
 
-    def _find_lamval_for_df(self, target_df, log10_lam_bounds=(-12, 12)):
+    def compute_df(self, lamval=None, eps=1e-12):
         """
-        Finds the exact lambda value that yields the target degrees of freedom
-        using the C++ implementation.
+        Compute the degrees of freedom for a given lambda.
         """
-        if target_df >= self.n_k_ - 0.01:
-            raise ValueError(f"Target DF ({target_df}) too high.")
+        if lamval is None:
+            lamval = self.lamval
+        
+        lam_scaled = lamval / (self.x_scale_ ** 3)
+        
+        if self.engine == 'bspline':
+            if self._NTWN is None:
+                self._NTWN = self._cpp_fitter.compute_design()
+            if self._Omega is None:
+                self._Omega = self._cpp_fitter.compute_penalty()
+                
+            NTWN = self._NTWN
+            Omega = self._Omega
+            n = NTWN.shape[1]
+            
+            NTWN_sub = NTWN[:, 1:n-1]
+            Omega_sub = Omega[:, 1:n-1]
+            
+            # Compute Cholesky explicitly and cache it
+            AB = lam_scaled * Omega_sub + NTWN_sub
+            
+            # Add small padding to ensure positive definiteness
+            if eps > 0:
+                AB[-1, :] += eps * (np.abs(AB[-1, :]).mean() + 1e-10)
+
+            try:
+                # lower=False for Upper Banded
+                U = cholesky_banded(AB, lower=False)
+                self._cholesky_cache[lam_scaled] = U
+                return trace_takahashi(U, NTWN_sub)
+            except np.linalg.LinAlgError:
+                return 0.0
+        else:
+            return self._cpp_fitter.compute_df(lam_scaled)
+
+    def _find_lamval_for_df(self, target_df, log10_lam_bounds=(-8, 12)):
+        """
+        Finds the exact lambda value that yields the target degrees of freedom.
+        """
+        # Bounds check logic
+        max_df = self.n_k_ if self.engine != 'bspline' else (self.n_k_ + self.order - 2)
+        if target_df >= max_df - 0.01:
+             return 1e-15 * (self.x_scale_ ** 3)
         if target_df <= 2.01:
-            raise ValueError(f"Target DF ({target_df}) too low.")
+             return 1e15 * (self.x_scale_ ** 3)
 
-        if hasattr(self._cpp_fitter, "solve_for_df"):
+        shift = 3 * np.log10(self.x_scale_)
+        min_log = log10_lam_bounds[0] - shift
+        max_log = log10_lam_bounds[1] - shift
+
+        if self.engine == 'bspline':
+            # Use Python root finding with Takahashi DF
+            def objective(log_lam):
+                return self.compute_df(10**log_lam) - target_df
+            
+            try:
+                log_lam_opt = brentq(objective, min_log + shift, max_log + shift)
+                return 10**log_lam_opt
+            except ValueError:
+                # Fallback or wider search?
+                return self._cpp_fitter.solve_for_df(target_df, min_log, max_log) * (self.x_scale_ ** 3)
+        else:
              try:
-                 # Note: log10_lam_bounds are currently ignored by C++ solver (uses [-12, 12])
-                 lam_scaled = self._cpp_fitter.solve_for_df(target_df)
+                 lam_scaled = self._cpp_fitter.solve_for_df(target_df, min_log, max_log)
                  return lam_scaled * (self.x_scale_ ** 3)
              except RuntimeError as e:
                  raise RuntimeError(f"C++ solver failed: {e}")
-        
-        raise RuntimeError("C++ extension required for finding lambda from DF.")
 
-    def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-10, 10)):
+    def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-20, 20)):
         """
         Find optimal lambda using GCV and fit the model using C++.
         """
@@ -130,7 +237,7 @@ class SplineFitter:
             self.update_weights(sample_weight)
         y_arr = np.asarray(y)
         
-        if hasattr(self, '_use_reinsch') and self._use_reinsch:
+        if self._use_reinsch:
              w_raw = self.w if self.w is not None else np.ones(len(y_arr))
              # w_agg is already in fitter, but we need it for y_agg
              w_agg = np.bincount(self._inverse_indices, weights=w_raw)
@@ -159,7 +266,6 @@ class SplineFitter:
         """
         Fit the smoothing spline using the C++ extension.
         """
-        self.y = y
         if sample_weight is not None:
             self.w = sample_weight
             if hasattr(self._cpp_fitter, "update_weights"):
@@ -172,7 +278,7 @@ class SplineFitter:
         lam_scaled = self.lamval / self.x_scale_**3
         
         y_arr = np.asarray(y)
-        if hasattr(self, '_use_reinsch') and self._use_reinsch:
+        if self._use_reinsch:
              w_raw = self.w if self.w is not None else np.ones(len(y_arr))
              w_agg = np.bincount(self._inverse_indices, weights=w_raw)
              y_sum = np.bincount(self._inverse_indices, weights=y_arr * w_raw)
@@ -180,16 +286,38 @@ class SplineFitter:
              
              self._cpp_fitter.fit(y_eff, lam_scaled)
         else:
-             self._cpp_fitter.fit(y_arr, lam_scaled)
+             if self.engine == 'bspline':
+                 if self._NTWN is None:
+                     self._NTWN = self._cpp_fitter.compute_design()
+                 if self._Omega is None:
+                     self._Omega = self._cpp_fitter.compute_penalty()
+                     
+                 b = self._cpp_fitter.compute_rhs(y_arr)
+                 
+                 n = b.shape[0]
+                 b_sub = b[1:n-1]
+                 
+                 if lam_scaled in self._cholesky_cache:
+                     U = self._cholesky_cache[lam_scaled]
+                     sol = cho_solve_banded((U, False), b_sub)
+                 else:
+                     NTWN_sub = self._NTWN[:, 1:n-1]
+                     Omega_sub = self._Omega[:, 1:n-1]
+                     AB = lam_scaled * Omega_sub + NTWN_sub
+                     sol = solveh_banded(AB, b_sub, lower=False)
+                     
+                 self._cpp_fitter.set_solution(sol)
+             else:
+                 self._cpp_fitter.fit(y_arr, lam_scaled)
 
+        # Compute intercept and coef (linear part)
         y_hat = self.predict(self.x)
-        if self.w is not None:
-            X = np.vander(self.x, 2)
-            Xw = X * self.w[:, None]
-            yw = y_hat * self.w
-            beta = np.linalg.lstsq(Xw, yw, rcond=None)[0]
-        else:
-            beta = np.polyfit(self.x, y_hat, 1)
+        w_eff = self.w if self.w is not None else np.ones(len(self.x))
+        
+        X = np.vander(self.x, 2)
+        Xw = X * w_eff[:, None]
+        yw = y_hat * w_eff
+        beta = np.linalg.lstsq(Xw, yw, rcond=None)[0]
 
         self.intercept_ = beta[1]
         self.coef_ = beta[0]
@@ -220,10 +348,12 @@ class SplineFitter:
         """
         The non-linear component of the fitted spline.
         """
+        if self.coef_ is None:
+            return None
         linear_part = self.coef_ * self.x + self.intercept_
         return self.predict(self.x) - linear_part
 
-    def update_weights(self, w, update_lamval=False):
+    def update_weights(self, w):
         """
         Update the weights and refit the model using C++.
         """
@@ -231,6 +361,21 @@ class SplineFitter:
         if hasattr(self._cpp_fitter, "update_weights"):
              self._cpp_fitter.update_weights(self.w)
         else:
+             # Re-create fitter if update_weights is not supported (e.g. BSpline currently)
              self._prepare_matrices()
-        if self.df is not None and update_lamval:
-            self.lamval = self._find_lamval_for_df(self.df)
+        
+    # Expose N and Omega if available (Natural Spline only usually)
+    @property
+    def N_(self):
+        if hasattr(self._cpp_fitter, "get_N"):
+            return self._cpp_fitter.get_N()
+        elif hasattr(self._cpp_fitter, "get_NTWN"):
+            # BSpline case, returns NTWN instead of N
+             return None 
+        return None
+
+    @property
+    def Omega_(self):
+        if hasattr(self._cpp_fitter, "get_Omega"):
+            return self._cpp_fitter.get_Omega()
+        return None

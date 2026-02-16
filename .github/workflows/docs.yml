@@ -38,7 +38,7 @@ jobs:
       - name: Build docs
         run: |
           cd docs
-          jupyter book build --html --execute
+          env BASE_URL=https://jonathan-taylor.github.io/smoothing_spline/ jupyter book build --html --execute
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from smoothing_spline.fitter import SplineFitter
-from smoothing_spline._spline_extension import CubicSplineTraceCpp, SplineFitterReinschCpp
+from smoothing_spline._spline_extension import CubicSplineTraceCpp, ReinschFitter
 
 @pytest.mark.parametrize("lam", np.logspace(-10, 2, 10))
 def test_unweighted_trace_cpp_agreement(lam):
@@ -26,14 +26,16 @@ def test_unweighted_trace_cpp_agreement(lam):
     # 2. Basis form DF calculation
     fitter_all_knots._use_reinsch = False
     fitter_all_knots._cpp_fitter = None # Force re-initialization
-    from smoothing_spline._spline_extension import SplineFitterCpp
-    x_scaled, knots_scaled = fitter_all_knots._setup_scaling_and_knots()
-    fitter_all_knots._cpp_fitter = SplineFitterCpp(x_scaled, knots_scaled, fitter_all_knots.w)
+    from smoothing_spline._spline_extension import NaturalSplineFitter
+    fitter_all_knots._setup_scaling_and_knots()
+    x_scaled = fitter_all_knots.x_scaled_
+    knots_scaled = fitter_all_knots.knots_scaled_
+    fitter_all_knots._cpp_fitter = NaturalSplineFitter(x_scaled, knots_scaled, fitter_all_knots.w)
     fitter_all_knots.lamval = lam
     df_basis_all_knots = fitter_all_knots._cpp_fitter.compute_df(lam_scaled)
     
     # 3. Sparse solve DF calculation
-    reinsch_fitter_cpp = SplineFitterReinschCpp(x_scaled_internal, weights=None)
+    reinsch_fitter_cpp = ReinschFitter(x_scaled_internal, weights=None)
     df_sparse_solve = reinsch_fitter_cpp.compute_df_sparse(lam_scaled)
 
     np.testing.assert_allclose(df_fast_cpp, df_basis_all_knots, atol=1e-4)

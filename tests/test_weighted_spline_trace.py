@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from smoothing_spline._spline_extension import SplineFitterReinschCpp
+from smoothing_spline._spline_extension import ReinschFitter
 from .weighted_spline_trace import WeightedCubicSplineTrace, naive_weighted_trace
 
 @pytest.mark.parametrize("lam", np.logspace(-10, 2, 5))
@@ -30,7 +30,7 @@ def test_weighted_trace_vs_reinsch_sparse(lam, use_weights):
     df_weighted_takahashi = weighted_trace_solver.compute_trace(lam_scaled)
 
     # 2. Sparse solve DF calculation from Reinsch fitter
-    reinsch_fitter_cpp = SplineFitterReinschCpp(x_scaled, weights)
+    reinsch_fitter_cpp = ReinschFitter(x_scaled, weights)
     df_sparse_solve = reinsch_fitter_cpp.compute_df_sparse(lam_scaled)
 
     # 3. Naive O(N^3) weighted trace calculation

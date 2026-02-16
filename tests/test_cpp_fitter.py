@@ -5,7 +5,7 @@ from scipy.sparse import linalg as splinalg
 from smoothing_spline.fitter import SplineFitter
 from tests.spline_fitter import SplineFitter as SplineFitterPy
 
-from smoothing_spline._spline_extension import SplineFitterCpp as ExtSplineFitterCpp
+from smoothing_spline._spline_extension import NaturalSplineFitter as ExtSplineFitterCpp
 
 def test_cpp_fitter_integration():
     rng = np.random.default_rng(99)
@@ -113,12 +113,12 @@ def test_cpp_prediction():
     y = np.sin(x) + rng.normal(0, 0.1, 50)
     
     # Pure Python fit
-    py_fitter = SplineFitterPy(x, df=5)
+    py_fitter = SplineFitterPy(x, lamval=0.2)
     py_fitter.fit(y)
     py_pred = py_fitter.predict(x)
     
     # C++ fit (Main Class)
-    cpp_fitter = SplineFitter(x, df=5)
+    cpp_fitter = SplineFitter(x, lamval=0.2)
     cpp_fitter.fit(y)
     cpp_pred = cpp_fitter.predict(x)
     
