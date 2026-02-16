@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from smoothing_spline.fitter import SplineFitter
-from smoothing_spline._spline_extension import CubicSplineTraceCpp, ReinschFitter
+from smoothing_spline.fitter import SplineSmoother
+from smoothing_spline._spline_extension import CubicSplineTraceCpp, ReinschSmoother
 
 @pytest.mark.parametrize("lam", np.logspace(-10, 2, 10))
 def test_unweighted_trace_cpp_agreement(lam):
@@ -15,7 +15,7 @@ def test_unweighted_trace_cpp_agreement(lam):
     y = np.sin(x) + rng.normal(0, 0.1, 100)
 
     # Setup the fitter
-    fitter_all_knots = SplineFitter(x, knots=x)
+    fitter_all_knots = SplineSmoother(x, knots=x)
     x_scaled_internal = (x - fitter_all_knots.x_min_) / fitter_all_knots.x_scale_
     
     # 1. O(N) trace calculation (Takahashi's algorithm)
@@ -26,16 +26,16 @@ def test_unweighted_trace_cpp_agreement(lam):
     # 2. Basis form DF calculation
     fitter_all_knots._use_reinsch = False
     fitter_all_knots._cpp_fitter = None # Force re-initialization
-    from smoothing_spline._spline_extension import NaturalSplineFitter
+    from smoothing_spline._spline_extension import NaturalSplineSmoother
     fitter_all_knots._setup_scaling_and_knots()
     x_scaled = fitter_all_knots.x_scaled_
     knots_scaled = fitter_all_knots.knots_scaled_
-    fitter_all_knots._cpp_fitter = NaturalSplineFitter(x_scaled, knots_scaled, fitter_all_knots.w)
+    fitter_all_knots._cpp_fitter = NaturalSplineSmoother(x_scaled, knots_scaled, fitter_all_knots.w)
     fitter_all_knots.lamval = lam
     df_basis_all_knots = fitter_all_knots._cpp_fitter.compute_df(lam_scaled)
     
     # 3. Sparse solve DF calculation
-    reinsch_fitter_cpp = ReinschFitter(x_scaled_internal, weights=None)
+    reinsch_fitter_cpp = ReinschSmoother(x_scaled_internal, weights=None)
     df_sparse_solve = reinsch_fitter_cpp.compute_df_sparse(lam_scaled)
 
     np.testing.assert_allclose(df_fast_cpp, df_basis_all_knots, atol=1e-4)

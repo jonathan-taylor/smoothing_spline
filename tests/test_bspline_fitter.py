@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from smoothing_spline.fitter import SplineFitter
+from smoothing_spline.fitter import SplineSmoother
 
 @pytest.mark.parametrize("n_samples", [50, 100])
 @pytest.mark.parametrize("weighted", [False, True])
@@ -27,16 +27,16 @@ def test_compare_bspline_natural_spline(n_samples, weighted, unequal_x):
     percs = np.linspace(0, 100, n_knots)
     knots = np.percentile(x, percs)
     
-    # 1. Natural Spline Fitter
-    sf = SplineFitter(x, w=w, knots=knots, df=10, engine='natural')
-    sf.fit(y)
+    # 1. Natural Spline Smoother
+    sf = SplineSmoother(x, w=w, knots=knots, df=10, engine='natural')
+    sf.smooth(y)
     y_pred_ns = sf.predict(x)
     lamval = sf.lamval
     
-    # 2. B-Spline Fitter
-    sf_bs = SplineFitter(x, w=w, knots=knots, lamval=lamval, engine='bspline')
+    # 2. B-Spline Smoother
+    sf_bs = SplineSmoother(x, w=w, knots=knots, lamval=lamval, engine='bspline')
     try:
-        sf_bs.fit(y)
+        sf_bs.smooth(y)
     except RuntimeError as e:
         if "LAPACK dpbsv failed" in str(e) or "Trailing B-spline" in str(e):
             pytest.skip(f"Solver failed due to conditioning: {e}")
@@ -73,8 +73,8 @@ def test_bspline_solve_for_df():
     target_df = 8.0
     
     # Fit with B-spline engine specifying df
-    fitter = SplineFitter(x, knots=knots, df=target_df, engine='bspline')
-    fitter.fit(y)
+    fitter = SplineSmoother(x, knots=knots, df=target_df, engine='bspline')
+    fitter.smooth(y)
     
     # Verify effective degrees of freedom
     # We can compute it manually using the fitted lambda
@@ -90,7 +90,7 @@ def test_bspline_solve_gcv():
     y = np.sin(2 * np.pi * x) + rng.normal(0, 0.1, n)
     knots = np.linspace(0, 1, 15)
     
-    fitter = SplineFitter(x, knots=knots, engine='bspline')
+    fitter = SplineSmoother(x, knots=knots, engine='bspline')
     best_lam = fitter.solve_gcv(y)
     
     assert best_lam > 0

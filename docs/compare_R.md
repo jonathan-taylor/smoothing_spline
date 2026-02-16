@@ -26,7 +26,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 from ISLP import load_data
-from smoothing_spline import SplineFitter
+from smoothing_spline import SplineSmoother
 
 %load_ext rpy2.ipython
 ```
@@ -64,8 +64,8 @@ We fit a smoothing spline with a specified degrees of freedom ($df=5$).
 
 ```{code-cell} ipython3
 # Fit model
-spl_py = SplineFitter(x=hr_numeric, df=df)
-spl_py.fit(bikers)
+spl_py = SplineSmoother(x=hr_numeric, df=df)
+spl_py.smooth(bikers)
 
 # Predict
 y_py = spl_py.predict(x_plot)
@@ -116,7 +116,7 @@ We will compare the execution time for fitting the model.
 
 ```{code-cell} ipython3
 # Python Timing
-t_py = %timeit -o -n 10 -r 3 SplineFitter(x=hr_numeric, df=10).fit(bikers)
+t_py = %timeit -o -n 10 -r 3 SplineSmoother(x=hr_numeric, df=10).smooth(bikers)
 
 # R Timing
 ```
@@ -155,7 +155,7 @@ The `smoothing_spline` package also supports finding $\lambda$ that minimizes th
 ```{code-cell} ipython3
 # Initialize fitter with data
 # Note: We use the internal C++ fitter for speed if available
-fitter = SplineFitter(x=hr_numeric, knots=np.unique(hr_numeric))
+fitter = SplineSmoother(x=hr_numeric, knots=np.unique(hr_numeric))
 
 # Solve for GCV
 best_lam = fitter.solve_gcv(bikers)
@@ -192,8 +192,8 @@ The relationship between hours and bikers might be better modeled on a log scale
 ```{code-cell} ipython3
 # Fit model on log(bikers)
 log_bikers = np.log(bikers + 1) # Add 1 to avoid log(0)
-spl_log = SplineFitter(x=hr_numeric, df=df)
-spl_log.fit(log_bikers)
+spl_log = SplineSmoother(x=hr_numeric, df=df)
+spl_log.smooth(log_bikers)
 
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.scatter(hr_numeric + np.random.normal(0, 0.1, len(hr_numeric)), log_bikers, 
@@ -219,13 +219,13 @@ y_syn = np.sin(np.sqrt(x_syn)*2) + rng.normal(0, 1, n_syn)
 x_plot = np.linspace(x_syn.min() - 1, x_syn.max() + 1, 200)
 
 # Python Fitting
-spline = SplineFitter(x=x_syn, df=df)
-spline.fit(y_syn)
+spline = SplineSmoother(x=x_syn, df=df)
+spline.smooth(y_syn)
 y_plot_py = spline.predict(x_plot)
 
 # Python Timing (using all unique x as knots)
 print(f"Python Timing (n={n_syn}, all knots):")
-%timeit SplineFitter(x=x_syn, df=df).fit(y_syn)
+%timeit SplineSmoother(x=x_syn, df=df).smooth(y_syn)
 ```
 
 ```{code-cell} ipython3
@@ -273,14 +273,14 @@ y_syn = np.sin(np.sqrt(x_syn)*2) + rng.normal(0, 1, n_syn)
 n_knots_reduced = 500 # Similar to R's behavior
 
 # Fit for plotting
-spline = SplineFitter(x=x_syn, df=df, n_knots=n_knots_reduced)
-spline.fit(y_syn)
+spline = SplineSmoother(x=x_syn, df=df, n_knots=n_knots_reduced)
+spline.smooth(y_syn)
 y_plot_py = spline.predict(x_plot)
 ```
 
 ```{code-cell} ipython3
 %%timeit 
-SplineFitter(x=x_syn, df=df, n_knots=n_knots_reduced).fit(y_syn)
+SplineSmoother(x=x_syn, df=df, n_knots=n_knots_reduced).smooth(y_syn)
 ```
 
 ```{code-cell} ipython3

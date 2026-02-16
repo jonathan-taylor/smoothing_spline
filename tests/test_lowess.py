@@ -1,6 +1,6 @@
 # import numpy as np
 # import pytest
-# from smoothing_spline.lowess import LowessFitter, LowessFitterNaive
+# from smoothing_spline.lowess import LowessSmoother, LowessSmootherNaive
 
 # def test_lowess_consistency():
 #     """
@@ -14,8 +14,8 @@
 #     # Test for different spans and degrees
 #     for span in [0.3, 0.7]:
 #         for degree in [1, 2]:
-#             py_fitter = LowessFitterNaive(x, span=span, degree=degree)
-#             cpp_fitter = LowessFitter(x, span=span, degree=degree)
+#             py_fitter = LowessSmootherNaive(x, span=span, degree=degree)
+#             cpp_fitter = LowessSmoother(x, span=span, degree=degree)
             
 #             py_fitter.fit(y)
 #             cpp_fitter.fit(y)
@@ -39,8 +39,8 @@
 #     y = x * 0.5 + rng.normal(0, 0.5, n)
 #     w = rng.uniform(0.1, 2.0, n)
     
-#     py_fitter = LowessFitterNaive(x, w=w, span=0.5, degree=1)
-#     cpp_fitter = LowessFitter(x, w=w, span=0.5, degree=1)
+#     py_fitter = LowessSmootherNaive(x, w=w, span=0.5, degree=1)
+#     cpp_fitter = LowessSmoother(x, w=w, span=0.5, degree=1)
     
 #     py_fitter.fit(y)
 #     cpp_fitter.fit(y)
@@ -60,7 +60,7 @@
 #     x = np.linspace(0, 10, 20)
 #     y = np.sin(x)
     
-#     fitter = LowessFitter(x, span=0.5)
+#     fitter = LowessSmoother(x, span=0.5)
 #     fitter.fit(y)
     
 #     val = 5.0

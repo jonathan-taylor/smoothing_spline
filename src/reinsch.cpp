@@ -89,7 +89,7 @@ double CubicSplineTraceCpp::compute_trace(double lam) {
 }
 
 /**
- * ReinschFitter implements the smoothing spline using the Reinsch algorithm.
+ * ReinschSmoother implements the smoothing spline using the Reinsch algorithm.
  * 
  * This approach is valid when the knots are exactly the unique data points x.
  * It solves the linear system for the second derivatives gamma:
@@ -98,7 +98,7 @@ double CubicSplineTraceCpp::compute_trace(double lam) {
  * The fitted values f are then recovered via:
  *   f = y - lambda * W^-1 * Q * gamma
  */
-ReinschFitter::ReinschFitter(const Eigen::Ref<const Eigen::VectorXd>& x, py::object weights_obj) {
+ReinschSmoother::ReinschSmoother(const Eigen::Ref<const Eigen::VectorXd>& x, py::object weights_obj) {
     x_ = x; n_ = x.size(); long n_inner = n_ - 2;
     Eigen::VectorXd h = x.segment(1, n_ - 1) - x.segment(0, n_ - 1);
     Eigen::VectorXd inv_h = h.cwiseInverse();
@@ -116,7 +116,7 @@ ReinschFitter::ReinschFitter(const Eigen::Ref<const Eigen::VectorXd>& x, py::obj
     update_weights(weights_obj);
 }
 
-void ReinschFitter::update_weights(py::object weights_obj) {
+void ReinschSmoother::update_weights(py::object weights_obj) {
     if (weights_obj.is_none()) weights_inv_ = Eigen::VectorXd::Ones(n_);
     else weights_inv_ = weights_obj.cast<Eigen::VectorXd>().cwiseInverse();
     Eigen::SparseMatrix<double> Winv(n_, n_);
@@ -126,7 +126,7 @@ void ReinschFitter::update_weights(py::object weights_obj) {
     M_ = Q_.transpose() * Winv * Q_;
 }
 
-Eigen::VectorXd ReinschFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
+Eigen::VectorXd ReinschSmoother::smooth(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
     Eigen::VectorXd QT_y = Q_.transpose() * y;
     Eigen::SparseMatrix<double> LHS = R_ + lamval * M_;
     Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
@@ -136,30 +136,30 @@ Eigen::VectorXd ReinschFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, d
     return f_;
 }
 
-double ReinschFitter::compute_df(double lamval) {
+double ReinschSmoother::compute_df(double lamval) {
     Eigen::VectorXd original_weights = weights_inv_.cwiseInverse();
     CubicSplineTraceCpp trace_solver(x_, py::cast(original_weights));
     return trace_solver.compute_trace(lamval);
 }
 
-double ReinschFitter::gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y) {
-    Eigen::VectorXd f = fit(y, lamval);
+double ReinschSmoother::gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y) {
+    Eigen::VectorXd f = smooth(y, lamval);
     double rss = ((y - f).array().square() * weights_inv_.cwiseInverse().array()).sum();
     double df = compute_df(lamval), n = (double)y.size(), denom = 1.0 - df / n;
     return (denom < 1e-6) ? 1e20 : (rss / n) / (denom * denom);
 }
 
-double ReinschFitter::solve_for_df(double target_df, double min_log_lam, double max_log_lam) {
+double ReinschSmoother::solve_for_df(double target_df, double min_log_lam, double max_log_lam) {
     auto func = [&](double log_lam) { return compute_df(std::pow(10.0, log_lam)) - target_df; };
     return std::pow(10.0, utils::brent_root(func, min_log_lam, max_log_lam));
 }
 
-double ReinschFitter::solve_gcv(const Eigen::Ref<const Eigen::VectorXd>& y, double min_log_lam, double max_log_lam) {
+double ReinschSmoother::solve_gcv(const Eigen::Ref<const Eigen::VectorXd>& y, double min_log_lam, double max_log_lam) {
     auto func = [&](double log_lam) { return gcv_score(std::pow(10.0, log_lam), y); };
     return std::pow(10.0, utils::brent_min(func, min_log_lam, max_log_lam));
 }
 
-double ReinschFitter::compute_df_sparse(double lamval) {
+double ReinschSmoother::compute_df_sparse(double lamval) {
     Eigen::SparseMatrix<double> LHS = R_ + lamval * M_;
     Eigen::MatrixXd LHS_dense = LHS;
     Eigen::MatrixXd M_dense = M_;
@@ -170,7 +170,7 @@ double ReinschFitter::compute_df_sparse(double lamval) {
     return (double)n_ - lamval * Sol.trace();
 }
 
-Eigen::VectorXd ReinschFitter::predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv) {
+Eigen::VectorXd ReinschSmoother::predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv) {
     Eigen::VectorXd M_c(n_); M_c[0] = 0.0; M_c[n_-1] = 0.0; M_c.segment(1, n_-2) = gamma_;
     Eigen::VectorXd y_p(x_new.size());
     for(long i=0; i<x_new.size(); ++i) {

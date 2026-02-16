@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
-from smoothing_spline.fitter import SplineFitter
-from tests.spline_fitter import SplineFitter as SplineFitterPy, compute_edf_reinsch
+from smoothing_spline.fitter import SplineSmoother
+from tests.spline_fitter import SplineSmoother as SplineSmootherPy, compute_edf_reinsch
 
 # Setup for R comparison
 try:
@@ -12,12 +12,12 @@ try:
 except ImportError:
     R_ENABLED = False
 
-from smoothing_spline._spline_extension import NaturalSplineFitter as ExtSplineFitterCpp
+from smoothing_spline._spline_extension import NaturalSplineSmoother as ExtSplineSmootherCpp
 
 # Create a fixture to parametrize tests over both implementations
 @pytest.fixture()
 def fitter_cls(request):
-    return SplineFitter
+    return SplineSmoother
 
 def test_smoothing_spline_lamval(fitter_cls):
     rng = np.random.default_rng(0)
@@ -25,7 +25,7 @@ def test_smoothing_spline_lamval(fitter_cls):
     y = np.sin(2 * np.pi * x) + rng.standard_normal(100) * 0.1
     
     fitter = fitter_cls(x, lamval=0.1)
-    fitter.fit(y)
+    fitter.smooth(y)
     y_pred = fitter.predict(x)
     
     assert y_pred.shape == x.shape
@@ -36,14 +36,14 @@ def test_smoothing_spline_df(fitter_cls):
     y = np.sin(2 * np.pi * x) + rng.standard_normal(100) * 0.1
     
     fitter = fitter_cls(x, df=5)
-    fitter.fit(y)
+    fitter.smooth(y)
     y_pred = fitter.predict(x)
     
     assert y_pred.shape == x.shape
 def test_reinsch_form_verification():
     """
     Verify the sparse Reinsch form EDF calculation against a dense matrix
-    formulation and cross-check the SplineFitter estimator (C++).
+    formulation and cross-check the SplineSmoother estimator (C++).
     """
 
 
@@ -79,9 +79,9 @@ def test_reinsch_form_verification():
     edf_dense = np.trace(S_matrix)
     np.testing.assert_allclose(edf_reinsch, edf_dense)
 
-    # B. Test SplineFitter estimator directly
-    islp_fitter = SplineFitter(x_small, lamval=lam_small, w=weights_small)
-    islp_fitter.fit(y_small)
+    # B. Test SplineSmoother estimator directly
+    islp_fitter = SplineSmoother(x_small, lamval=lam_small, w=weights_small)
+    islp_fitter.smooth(y_small)
     islp_pred = islp_fitter.predict(x_small)
     y_our_matrix = S_matrix @ y_small
     np.testing.assert_allclose(islp_pred, y_our_matrix, rtol=1e-6, atol=1e-6)
@@ -92,15 +92,15 @@ def test_reinsch_form_verification():
     # Since we removed make_smoothing_spline, we'll compare against a new fit
     # of our own estimator, which should be identical if x is the same.
     # This is a sanity check. A better test would be against a known result.
-    islp_fitter2 = SplineFitter(x_small, lamval=lam_small, w=weights_small)
-    islp_fitter2.fit(y_small)
+    islp_fitter2 = SplineSmoother(x_small, lamval=lam_small, w=weights_small)
+    islp_fitter2.smooth(y_small)
     islp_pred2_new = islp_fitter2.predict(x_pred_new)
     np.testing.assert_allclose(islp_pred_new, islp_pred2_new, rtol=1e-6, atol=1e-6)
 
 
 def test_penalized_spline_thinned_knots(fitter_cls):
     """
-    Test that SplineFitter runs with a reduced number of knots.
+    Test that SplineSmoother runs with a reduced number of knots.
     """
     rng = np.random.default_rng(2)
     x = np.linspace(0, 1, 100)
@@ -108,20 +108,20 @@ def test_penalized_spline_thinned_knots(fitter_cls):
     
     # Fit with a small number of knots
     penalized_spline = fitter_cls(x, df=6, n_knots=20)
-    penalized_spline.fit(y)
+    penalized_spline.smooth(y)
     penalized_pred = penalized_spline.predict(x)
     assert penalized_pred.shape == x.shape
 
 def test_natural_spline_extrapolation(fitter_cls):
     """
-    Verify that SplineFitter correctly performs linear extrapolation.
+    Verify that SplineSmoother correctly performs linear extrapolation.
     """
     rng = np.random.default_rng(3)
     x = np.linspace(0, 1, 50)
     y = np.sin(4 * np.pi * x) + rng.normal(0, 0.2, size=x.shape)
     
     natural_spline = fitter_cls(x, df=8)
-    natural_spline.fit(y)
+    natural_spline.smooth(y)
     
     # Test extrapolation
     x_extrap = np.linspace(1.1, 2, 10)
@@ -148,13 +148,13 @@ def test_natural_spline_comparison_with_R(use_weights, has_duplicates, use_df):
     y = np.sin(2 * np.pi * x) + rng.normal(0, 0.3, x.shape[0])
     weights = rng.uniform(0.5, 1.5, size=x.shape) if use_weights else None
 
-    # ISLP SplineFitter fitting with explicit knots (all unique x)
+    # ISLP SplineSmoother fitting with explicit knots (all unique x)
     if use_df:
-        islp_fitter = SplineFitter(x, df=8, w=weights)
+        islp_fitter = SplineSmoother(x, df=8, w=weights)
     else:
-        islp_fitter = SplineFitter(x, lamval=0.0001, w=weights)
+        islp_fitter = SplineSmoother(x, lamval=0.0001, w=weights)
 
-    islp_fitter.fit(y)
+    islp_fitter.smooth(y)
     x_pred_new = np.linspace(x.min()-1, x.max()+1, 200)
     islp_pred = islp_fitter.predict(x)
 
@@ -182,7 +182,7 @@ def test_natural_spline_comparison_with_R(use_weights, has_duplicates, use_df):
     np.testing.assert_allclose(islp_fitter.predict(x_pred_new), r_pred_new, rtol=1e-3, atol=1e-3)
 def test_solve_gcv(fitter_cls):
     """
-    Test the solve_gcv method of SplineFitter.
+    Test the solve_gcv method of SplineSmoother.
     """
 
         
