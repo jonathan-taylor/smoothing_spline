@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.linalg import solveh_banded
 
-from _spline_extension import (
+from ._spline_extension import (
     NaturalSplineFitter, 
     ReinschFitter, 
     BSplineFitter
