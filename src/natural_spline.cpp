@@ -206,14 +206,14 @@ Eigen::MatrixXd compute_penalty_matrix(const Eigen::Ref<const Eigen::VectorXd>& 
     return Q * X;
 }
 
-NaturalSplineFitter::NaturalSplineFitter(const Eigen::Ref<const Eigen::VectorXd>& x, const Eigen::Ref<const Eigen::VectorXd>& knots, py::object weights_obj) {
+NaturalSplineSmoother::NaturalSplineSmoother(const Eigen::Ref<const Eigen::VectorXd>& x, const Eigen::Ref<const Eigen::VectorXd>& knots, py::object weights_obj) {
     knots_ = knots;
     N_ = compute_natural_spline_basis(x, knots, true, 0);
     Omega_ = compute_penalty_matrix(knots);
     update_weights(weights_obj);
 }
 
-void NaturalSplineFitter::update_weights(py::object weights_obj) {
+void NaturalSplineSmoother::update_weights(py::object weights_obj) {
     if (weights_obj.is_none()) {
         NTW_ = N_.transpose(); 
         NTWN_ = N_.transpose() * N_;
@@ -225,7 +225,7 @@ void NaturalSplineFitter::update_weights(py::object weights_obj) {
     }
 }
 
-Eigen::VectorXd NaturalSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
+Eigen::VectorXd NaturalSplineSmoother::smooth(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
     Eigen::MatrixXd LHS = NTWN_ + lamval * Omega_;
     Eigen::VectorXd RHS = NTW_ * y;
     Eigen::LLT<Eigen::MatrixXd> solver;
@@ -238,12 +238,12 @@ Eigen::VectorXd NaturalSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>
     return alpha_;
 }
 
-Eigen::VectorXd NaturalSplineFitter::predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv) {
+Eigen::VectorXd NaturalSplineSmoother::predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv) {
     Eigen::MatrixXd N_new = compute_natural_spline_basis(x_new, knots_, true, deriv);
     return N_new * alpha_;
 }
 
-double NaturalSplineFitter::compute_df(double lamval) {
+double NaturalSplineSmoother::compute_df(double lamval) {
     Eigen::MatrixXd LHS = NTWN_ + lamval * Omega_;
     Eigen::LLT<Eigen::MatrixXd> solver;
     solver.compute(LHS);
@@ -252,8 +252,8 @@ double NaturalSplineFitter::compute_df(double lamval) {
     return X.trace();
 }
 
-double NaturalSplineFitter::gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y) {
-    Eigen::VectorXd alpha = fit(y, lamval);
+double NaturalSplineSmoother::gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y) {
+    Eigen::VectorXd alpha = smooth(y, lamval);
     Eigen::VectorXd f = N_ * alpha;
     double rss = (y - f).squaredNorm(); 
     double df = compute_df(lamval);
@@ -263,15 +263,15 @@ double NaturalSplineFitter::gcv_score(double lamval, const Eigen::Ref<const Eige
     return (rss / n) / (denom * denom);
 }
 
-double NaturalSplineFitter::solve_for_df(double target_df, double min_log_lam, double max_log_lam) {
+double NaturalSplineSmoother::solve_for_df(double target_df, double min_log_lam, double max_log_lam) {
     auto func = [&](double log_lam) { return compute_df(std::pow(10.0, log_lam)) - target_df; };
     return std::pow(10.0, utils::brent_root(func, min_log_lam, max_log_lam));
 }
 
-double NaturalSplineFitter::solve_gcv(const Eigen::Ref<const Eigen::VectorXd>& y, double min_log_lam, double max_log_lam) {
+double NaturalSplineSmoother::solve_gcv(const Eigen::Ref<const Eigen::VectorXd>& y, double min_log_lam, double max_log_lam) {
     auto func = [&](double log_lam) { return gcv_score(std::pow(10.0, log_lam), y); };
     return std::pow(10.0, utils::brent_min(func, min_log_lam, max_log_lam));
 }
 
-Eigen::MatrixXd NaturalSplineFitter::get_N() { return N_; }
-Eigen::MatrixXd NaturalSplineFitter::get_Omega() { return Omega_; }
+Eigen::MatrixXd NaturalSplineSmoother::get_N() { return N_; }
+Eigen::MatrixXd NaturalSplineSmoother::get_Omega() { return Omega_; }

@@ -1,5 +1,5 @@
 import numpy as np
-from smoothing_spline.fitter import SplineFitter
+from smoothing_spline.fitter import SplineSmoother
 
 def test_bspline_df_takahashi():
     np.random.seed(42)
@@ -8,7 +8,7 @@ def test_bspline_df_takahashi():
     y = np.sin(10 * x) + np.random.normal(0, 0.1, n)
     
     # Init with bspline engine
-    spline = SplineFitter(x, engine='bspline', order=4, n_knots=10)
+    spline = SplineSmoother(x, engine='bspline', order=4, n_knots=10)
     
     lam = 1e-4
     df_takahashi = spline.compute_df(lam)

@@ -6,16 +6,16 @@ from scipy.linalg import (cholesky_banded,
 from scipy.optimize import brentq
 
 from ._spline_extension import (
-    NaturalSplineFitter, 
-    ReinschFitter, 
-    BSplineFitter,
+    NaturalSplineSmoother, 
+    ReinschSmoother, 
+    BSplineSmoother,
     trace_takahashi
 )
 
 @dataclass
-class SplineFitter:
+class SplineSmoother:
     """
-    SplineFitter implementation using C++ extension for performance.
+    SplineSmoother implementation using C++ extension for performance.
     
     Parameters
     ----------
@@ -60,7 +60,7 @@ class SplineFitter:
     knots_scaled_: np.ndarray = field(init=False, default=None)
     n_k_: int = field(init=False, default=0)
 
-    # Exposed attributes (populated after fit/init)
+    # Exposed attributes (populated after smooth/init)
     coef_: float = field(init=False, default=None)
     intercept_: float = field(init=False, default=None)
 
@@ -142,17 +142,17 @@ class SplineFitter:
             w_raw = self.w if self.w is not None else np.ones(len(self.x_scaled_))
             w_agg = np.bincount(inverse, weights=w_raw)
             
-            self._cpp_fitter = ReinschFitter(self.knots_scaled_, w_agg)
+            self._cpp_fitter = ReinschSmoother(self.knots_scaled_, w_agg)
             
         elif self.engine == 'bspline':
             self._use_reinsch = False
-            self._cpp_fitter = BSplineFitter(self.x_scaled_, self.knots_scaled_, self.w, self.order)
+            self._cpp_fitter = BSplineSmoother(self.x_scaled_, self.knots_scaled_, self.w, self.order)
             self._NTWN = None
             self._Omega = None
             
         elif self.engine == 'natural':
             self._use_reinsch = False
-            self._cpp_fitter = NaturalSplineFitter(self.x_scaled_, self.knots_scaled_, self.w)
+            self._cpp_fitter = NaturalSplineSmoother(self.x_scaled_, self.knots_scaled_, self.w)
             
         else:
             raise ValueError(f"Unknown engine: {self.engine}")
@@ -231,7 +231,7 @@ class SplineFitter:
 
     def solve_gcv(self, y, sample_weight=None, log10_lam_bounds=(-20, 20)):
         """
-        Find optimal lambda using GCV and fit the model using C++.
+        Find optimal lambda using GCV and smooth the model using C++.
         """
         if sample_weight is not None:
             self.update_weights(sample_weight)
@@ -255,16 +255,16 @@ class SplineFitter:
              try:
                  lam_scaled = self._cpp_fitter.solve_gcv(y_eff, min_log, max_log)
                  self.lamval = lam_scaled * (self.x_scale_ ** 3)
-                 self.fit(y)
+                 self.smooth(y)
                  return self.lamval
              except RuntimeError as e:
                  raise RuntimeError(f"C++ GCV solver failed: {e}")
                  
         raise RuntimeError("C++ extension required for GCV optimization.")
 
-    def fit(self, y, sample_weight=None):
+    def smooth(self, y, sample_weight=None):
         """
-        Fit the smoothing spline using the C++ extension.
+        Smooth the smoothing spline using the C++ extension.
         """
         if sample_weight is not None:
             self.w = sample_weight
@@ -284,7 +284,7 @@ class SplineFitter:
              y_sum = np.bincount(self._inverse_indices, weights=y_arr * w_raw)
              y_eff = y_sum / w_agg
              
-             self._cpp_fitter.fit(y_eff, lam_scaled)
+             self._cpp_fitter.smooth(y_eff, lam_scaled)
         else:
              if self.engine == 'bspline':
                  if self._NTWN is None:
@@ -308,7 +308,7 @@ class SplineFitter:
                      
                  self._cpp_fitter.set_solution(sol)
              else:
-                 self._cpp_fitter.fit(y_arr, lam_scaled)
+                 self._cpp_fitter.smooth(y_arr, lam_scaled)
 
         # Compute intercept and coef (linear part)
         y_hat = self.predict(self.x)

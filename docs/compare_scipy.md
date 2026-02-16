@@ -14,7 +14,7 @@ kernelspec:
 
 # Boundary Behavior Comparison: `smoothing_spline` vs `scipy`
 
-This document illustrates the differences in boundary behavior and extrapolation between `smoothing_spline.SplineFitter` and `scipy.interpolate.make_smoothing_spline`.
+This document illustrates the differences in boundary behavior and extrapolation between `smoothing_spline.SplineSmoother` and `scipy.interpolate.make_smoothing_spline`.
 
 While both methods fit smoothing splines, `smoothing_spline` explicitly implements **natural cubic splines**, which implies that the function should be linear beyond the boundary knots (i.e., the second derivative is zero at the boundaries).
 
@@ -26,7 +26,7 @@ We will demonstrate this by fitting both models to a dataset and observing their
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import make_smoothing_spline
-from smoothing_spline import SplineFitter
+from smoothing_spline import SplineSmoother
 
 # Generate synthetic data
 rng = np.random.default_rng(42)
@@ -41,7 +41,7 @@ x_plot = np.linspace(x.min() - 0.5 * x_range, x.max() + 0.5 * x_range, 200)
 
 ## Fitting the Models
 
-We will fit both models using a similar regularization strength. Note that the parameterization of $\lambda$ might differ slightly, but we will try to match the degrees of freedom or visual smoothness for a fair qualitative comparison. Here we fix `lam` for `make_smoothing_spline` and use `solve_gcv` or fixed lambda for `SplineFitter`.
+We will fit both models using a similar regularization strength. Note that the parameterization of $\lambda$ might differ slightly, but we will try to match the degrees of freedom or visual smoothness for a fair qualitative comparison. Here we fix `lam` for `make_smoothing_spline` and use `solve_gcv` or fixed lambda for `SplineSmoother`.
 
 For simplicity, let's fix a lambda value that provides a reasonable smooth fit.
 
@@ -49,7 +49,7 @@ For simplicity, let's fix a lambda value that provides a reasonable smooth fit.
 # Fit smoothing_spline
 # We explicitly ask for a specific lambda or let GCV find one.
 # Let's use GCV for smoothing_spline to get a good fit first.
-fitter = SplineFitter(x, n_knots=25)
+fitter = SplineSmoother(x, n_knots=25)
 lam_best = fitter.solve_gcv(y)
 y_ours = fitter.predict(x_plot)
 
@@ -57,7 +57,7 @@ y_ours = fitter.predict(x_plot)
 # scipy's lam is roughly related. We'll try to use a similar value or just pick one that looks good.
 # SciPy documentation says minimizes \sum w_i (y_i - g(x_i))^2 + lam \int g''(t)^2 dt
 # Our objective is essentially the same.
-# Note: SplineFitter scales x internally to [0, range]. Scipy does not?
+# Note: SplineSmoother scales x internally to [0, range]. Scipy does not?
 # Let's just try to match them or show the qualitative difference.
 # We'll calculate the lambda that scipy would use?
 # Let's just fit scipy with a specific lambda to ensure smoothness.

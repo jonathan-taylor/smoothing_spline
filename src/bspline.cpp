@@ -50,7 +50,7 @@ namespace bspline {
     }
 }
 
-BSplineFitter::BSplineFitter(const Eigen::Ref<const Eigen::VectorXd>& x, const Eigen::Ref<const Eigen::VectorXd>& i_k, py::object w_obj, int order) : order_(order), x_(x) {
+BSplineSmoother::BSplineSmoother(const Eigen::Ref<const Eigen::VectorXd>& x, const Eigen::Ref<const Eigen::VectorXd>& i_k, py::object w_obj, int order) : order_(order), x_(x) {
     long n_i = i_k.size(), n_a = n_i + 2 * (order - 1); knots_.resize(n_a);
     for(int i=0; i<order; ++i) knots_[i] = i_k[0];
     if (n_i > 2) knots_.segment(order, n_i - 2) = i_k.segment(1, n_i - 2);
@@ -61,7 +61,7 @@ BSplineFitter::BSplineFitter(const Eigen::Ref<const Eigen::VectorXd>& x, const E
     Omega_band_ = Eigen::MatrixXd::Zero(kd + 1, n_basis_); initialize_penalty();
 }
 
-void BSplineFitter::initialize_design() {
+void BSplineSmoother::initialize_design() {
     Eigen::VectorXd b_v(order_); int s_i;
     int kd = order_ - 1;
     for (int i = 0; i < x_.size(); ++i) {
@@ -76,7 +76,7 @@ void BSplineFitter::initialize_design() {
     }
 }
 
-void BSplineFitter::initialize_penalty() {
+void BSplineSmoother::initialize_penalty() {
     double pt = 1.0 / std::sqrt(3.0); double gp[2] = {-pt, pt}, gw[2] = {1.0, 1.0};
     int s_k = order_ - 1, e_k = (int)knots_.size() - order_; Eigen::VectorXd b_d(order_); int s_i;
     int kd = order_ - 1;
@@ -96,16 +96,16 @@ void BSplineFitter::initialize_penalty() {
     }
 }
 
-Eigen::VectorXd BSplineFitter::eval_basis(double x_val, int deriv) {
+Eigen::VectorXd BSplineSmoother::eval_basis(double x_val, int deriv) {
     Eigen::VectorXd v = Eigen::VectorXd::Zero(n_basis_), b_v(order_); int s_i;
     bspline::eval_bspline_basis(x_val, order_, knots_, s_i, b_v, deriv);
     for(int j=0; j<order_; ++j) { int idx = s_i + j; if(idx < n_basis_) v[idx] = b_v[j]; }
     return v;
 }
 
-Eigen::VectorXd BSplineFitter::get_knots() { return knots_; }
+Eigen::VectorXd BSplineSmoother::get_knots() { return knots_; }
 
-Eigen::MatrixXd BSplineFitter::get_NTWN() {
+Eigen::MatrixXd BSplineSmoother::get_NTWN() {
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(n_basis_, n_basis_); int kd = order_ - 1;
     for (int j = 0; j < n_basis_; ++j) { 
         for (int i = 0; i <= kd; ++i) { 
@@ -120,7 +120,7 @@ Eigen::MatrixXd BSplineFitter::get_NTWN() {
     return M;
 }
 
-Eigen::MatrixXd BSplineFitter::get_Omega() {
+Eigen::MatrixXd BSplineSmoother::get_Omega() {
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(n_basis_, n_basis_); int kd = order_ - 1;
     for (int j = 0; j < n_basis_; ++j) { 
         for (int i = 0; i <= kd; ++i) { 
@@ -173,7 +173,7 @@ Eigen::MatrixXd BSplineFitter::get_Omega() {
 // only affects the top-left (leading) and bottom-right (trailing) corners of the matrix.
 // -----------------------------------------------------------------------------------------
 
-void BSplineFitter::get_boundary_weights(double& ws1, double& ws2, double& we1, double& we2) {
+void BSplineSmoother::get_boundary_weights(double& ws1, double& ws2, double& we1, double& we2) {
     int s_i;
     Eigen::VectorXd d2_v(order_); 
     
@@ -198,7 +198,7 @@ void BSplineFitter::get_boundary_weights(double& ws1, double& ws2, double& we1, 
     we2 = -u2 / u0;
 }
 
-void BSplineFitter::apply_constraints(Eigen::MatrixXd& M) {
+void BSplineSmoother::apply_constraints(Eigen::MatrixXd& M) {
     // This function computes P^T * M * P in-place.
     // M is stored in Upper Banded format.
     // P maps reduced indices 0..N-3 to full indices 0..N-1.
@@ -278,7 +278,7 @@ void BSplineFitter::apply_constraints(Eigen::MatrixXd& M) {
     }
 }
 
-void BSplineFitter::apply_constraints(Eigen::VectorXd& v) {
+void BSplineSmoother::apply_constraints(Eigen::VectorXd& v) {
     // Computes P^T * v for a vector v.
     // This maps the right-hand side vector from size N to N-2.
     // v_reduced[0] = v[1] + ws1 * v[0]
@@ -296,19 +296,19 @@ void BSplineFitter::apply_constraints(Eigen::VectorXd& v) {
     v[n-3] += we2 * v[n-1];
 }
 
-Eigen::MatrixXd BSplineFitter::compute_design() {
+Eigen::MatrixXd BSplineSmoother::compute_design() {
     Eigen::MatrixXd NTWN = AB_template_;
     apply_constraints(NTWN);
     return NTWN;
 }
 
-Eigen::MatrixXd BSplineFitter::compute_penalty() {
+Eigen::MatrixXd BSplineSmoother::compute_penalty() {
     Eigen::MatrixXd Omega = Omega_band_;
     apply_constraints(Omega);
     return Omega;
 }
 
-Eigen::VectorXd BSplineFitter::compute_rhs(const Eigen::Ref<const Eigen::VectorXd>& y) {
+Eigen::VectorXd BSplineSmoother::compute_rhs(const Eigen::Ref<const Eigen::VectorXd>& y) {
     int n = n_basis_;
     Eigen::VectorXd b = Eigen::VectorXd::Zero(n), b_v(order_); 
     int s_i;
@@ -320,7 +320,7 @@ Eigen::VectorXd BSplineFitter::compute_rhs(const Eigen::Ref<const Eigen::VectorX
     return b;
 }
 
-void BSplineFitter::set_solution(const Eigen::Ref<const Eigen::VectorXd>& sol) {
+void BSplineSmoother::set_solution(const Eigen::Ref<const Eigen::VectorXd>& sol) {
     int n = n_basis_;
     if (sol.size() != n - 2) throw std::runtime_error("Solution size mismatch. Expected " + std::to_string(n-2) + ", got " + std::to_string(sol.size()));
     
@@ -334,7 +334,7 @@ void BSplineFitter::set_solution(const Eigen::Ref<const Eigen::VectorXd>& sol) {
     coeffs_[n-1] = we1 * coeffs_[n-2] + we2 * coeffs_[n-3];
 }
 
-Eigen::VectorXd BSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
+Eigen::VectorXd BSplineSmoother::smooth(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval) {
     Eigen::MatrixXd NTWN = compute_design();
     Eigen::MatrixXd Omega = compute_penalty();
     Eigen::VectorXd b = compute_rhs(y);
@@ -368,7 +368,7 @@ Eigen::VectorXd BSplineFitter::fit(const Eigen::Ref<const Eigen::VectorXd>& y, d
     Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
     solver.compute(A_sparse);
     if(solver.info() != Eigen::Success) {
-        throw std::runtime_error("Decomposition failed in BSplineFitter::fit");
+        throw std::runtime_error("Decomposition failed in BSplineSmoother::fit");
     }
     
     Eigen::VectorXd sol = solver.solve(b_sub);
@@ -396,7 +396,7 @@ namespace {
     }
 }
 
-double BSplineFitter::compute_df(double lamval) {
+double BSplineSmoother::compute_df(double lamval) {
     int n = n_basis_, kd = order_ - 1;
     
     Eigen::SparseMatrix<double> NTWN_sparse = banded_to_sparse(AB_template_, n, kd);
@@ -444,8 +444,8 @@ double BSplineFitter::compute_df(double lamval) {
     return trace;
 }
 
-double BSplineFitter::gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y) {
-    fit(y, lamval);
+double BSplineSmoother::gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y) {
+    smooth(y, lamval);
     Eigen::VectorXd f = predict(x_, 0);
     double rss = 0.0;
     for(int i=0; i<x_.size(); ++i) {
@@ -458,17 +458,17 @@ double BSplineFitter::gcv_score(double lamval, const Eigen::Ref<const Eigen::Vec
     return (rss / n) / (denom * denom);
 }
 
-double BSplineFitter::solve_for_df(double target_df, double min_log_lam, double max_log_lam) {
+double BSplineSmoother::solve_for_df(double target_df, double min_log_lam, double max_log_lam) {
     auto func = [&](double log_lam) { return compute_df(std::pow(10.0, log_lam)) - target_df; };
     return std::pow(10.0, utils::brent_root(func, min_log_lam, max_log_lam));
 }
 
-double BSplineFitter::solve_gcv(const Eigen::Ref<const Eigen::VectorXd>& y, double min_log_lam, double max_log_lam) {
+double BSplineSmoother::solve_gcv(const Eigen::Ref<const Eigen::VectorXd>& y, double min_log_lam, double max_log_lam) {
     auto func = [&](double log_lam) { return gcv_score(std::pow(10.0, log_lam), y); };
     return std::pow(10.0, utils::brent_min(func, min_log_lam, max_log_lam));
 }
 
-Eigen::VectorXd BSplineFitter::predict(const Eigen::Ref<const Eigen::VectorXd>& x_n, int deriv) {
+Eigen::VectorXd BSplineSmoother::predict(const Eigen::Ref<const Eigen::VectorXd>& x_n, int deriv) {
     Eigen::VectorXd y_p(x_n.size()), b_v(order_); int s_i; double d_min = knots_[order_-1], d_max = knots_[knots_.size() - order_];
     for (int i = 0; i < (int)x_n.size(); ++i) {
         double val = x_n[i];

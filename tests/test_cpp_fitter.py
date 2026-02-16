@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
-from smoothing_spline.fitter import SplineFitter
-from tests.spline_fitter import SplineFitter as SplineFitterPy
+from smoothing_spline.fitter import SplineSmoother
+from tests.spline_fitter import SplineSmoother as SplineSmootherPy
 
-from smoothing_spline._spline_extension import NaturalSplineFitter as ExtSplineFitterCpp
+from smoothing_spline._spline_extension import NaturalSplineSmoother as ExtSplineSmootherCpp
 
 def test_cpp_fitter_integration():
     rng = np.random.default_rng(99)
@@ -14,7 +14,7 @@ def test_cpp_fitter_integration():
     y = np.sin(x) + rng.normal(0, 0.1, 50)
     
     # Python Matrices (using pure python implementation)
-    py_fitter = SplineFitterPy(x, knots=knots)
+    py_fitter = SplineSmootherPy(x, knots=knots)
     py_fitter._prepare_matrices() # Computes N_, NTW_, Omega_
     
     # C++ Matrices via Class
@@ -29,7 +29,7 @@ def test_cpp_fitter_integration():
     knots_scaled = (knots - x_min) / scale
     
     # 1. Compare exact matrices by passing scaled data to C++
-    cpp_fitter_scaled = ExtSplineFitterCpp(x_scaled, knots_scaled)
+    cpp_fitter_scaled = ExtSplineSmootherCpp(x_scaled, knots_scaled)
     cpp_N = cpp_fitter_scaled.get_N()
     cpp_Omega = cpp_fitter_scaled.get_Omega()
     
@@ -40,7 +40,7 @@ def test_cpp_fitter_integration():
     # Python uses scaled lambda and scaled matrices -> invariant objective
     # C++ using raw data should need RAW lambda to get same alpha
     
-    cpp_fitter_raw = ExtSplineFitterCpp(x, knots)
+    cpp_fitter_raw = ExtSplineSmootherCpp(x, knots)
     
     lamval = 0.5
     # Python solve
@@ -50,7 +50,7 @@ def test_cpp_fitter_integration():
     py_alpha = np.linalg.solve(LHS, RHS)
     
     # C++ fit with raw lambda
-    cpp_alpha = cpp_fitter_raw.fit(y, lamval)
+    cpp_alpha = cpp_fitter_raw.smooth(y, lamval)
     
     np.testing.assert_allclose(cpp_alpha, py_alpha, atol=1e-5)
 
@@ -61,11 +61,11 @@ def test_cpp_fitter_weights():
     y = np.sin(x) + rng.normal(0, 0.1, 50)
     w = rng.uniform(0.5, 2.0, 50)
     
-    py_fitter = SplineFitterPy(x, knots=knots, w=w)
+    py_fitter = SplineSmootherPy(x, knots=knots, w=w)
     py_fitter._prepare_matrices()
     
     # C++ uses raw x, knots
-    cpp_fitter = ExtSplineFitterCpp(x, knots, w)
+    cpp_fitter = ExtSplineSmootherCpp(x, knots, w)
     
     lamval = 0.5
     # Python internally scales, so we replicate the math for verification
@@ -79,7 +79,7 @@ def test_cpp_fitter_weights():
     py_alpha = np.linalg.solve(LHS, RHS)
     
     # C++ fit with raw lambda
-    cpp_alpha = cpp_fitter.fit(y, lamval)
+    cpp_alpha = cpp_fitter.smooth(y, lamval)
     
     np.testing.assert_allclose(cpp_alpha, py_alpha, atol=1e-5)
 
@@ -88,10 +88,10 @@ def test_cpp_df():
     x = np.sort(rng.uniform(0, 10, 50))
     knots = np.sort(rng.uniform(0, 10, 10))
     
-    py_fitter = SplineFitterPy(x, knots=knots)
+    py_fitter = SplineSmootherPy(x, knots=knots)
     py_fitter._prepare_matrices()
     
-    cpp_fitter = ExtSplineFitterCpp(x, knots)
+    cpp_fitter = ExtSplineSmootherCpp(x, knots)
     
     lamval = 0.5
     # Python DF
@@ -107,19 +107,19 @@ def test_cpp_df():
     np.testing.assert_allclose(cpp_df, py_df, atol=1e-5)
 
 def test_cpp_prediction():
-    # Helper already imports SplineFitter as SplineFitterPy
+    # Helper already imports SplineSmoother as SplineSmootherPy
     rng = np.random.default_rng(102)
     x = np.sort(rng.uniform(0, 10, 50))
     y = np.sin(x) + rng.normal(0, 0.1, 50)
     
     # Pure Python fit
-    py_fitter = SplineFitterPy(x, lamval=0.2)
-    py_fitter.fit(y)
+    py_fitter = SplineSmootherPy(x, lamval=0.2)
+    py_fitter.smooth(y)
     py_pred = py_fitter.predict(x)
     
     # C++ fit (Main Class)
-    cpp_fitter = SplineFitter(x, lamval=0.2)
-    cpp_fitter.fit(y)
+    cpp_fitter = SplineSmoother(x, lamval=0.2)
+    cpp_fitter.smooth(y)
     cpp_pred = cpp_fitter.predict(x)
     
     np.testing.assert_allclose(cpp_pred, py_pred, atol=1e-5)

@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from smoothing_spline.fitter import SplineFitter
+from smoothing_spline.fitter import SplineSmoother
 
 @pytest.mark.xfail(reason="Derivative calculation is not accurate enough at the boundaries.")
 def test_derivatives():
@@ -12,9 +12,9 @@ def test_derivatives():
     y = x**2
     
     # Fit a spline to the function
-    fitter = SplineFitter(x, n_knots=20)
+    fitter = SplineSmoother(x, n_knots=20)
     fitter.lamval = 1e-8 # Use a small lambda to closely follow the function
-    fitter.fit(y)
+    fitter.smooth(y)
     
     # Check the first derivative
     d1_true = 2 * x

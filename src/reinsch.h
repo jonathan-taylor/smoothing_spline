@@ -18,12 +18,12 @@ public:
     double compute_trace(double lam);
 };
 
-class ReinschFitter {
+class ReinschSmoother {
     Eigen::SparseMatrix<double> Q_, R_, M_; Eigen::VectorXd weights_inv_, x_, gamma_, f_; long n_;
 public:
-    ReinschFitter(const Eigen::Ref<const Eigen::VectorXd>& x, py::object weights_obj);
+    ReinschSmoother(const Eigen::Ref<const Eigen::VectorXd>& x, py::object weights_obj);
     void update_weights(py::object weights_obj);
-    Eigen::VectorXd fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval);
+    Eigen::VectorXd smooth(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval);
     double compute_df(double lamval);
     double gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y);
     double solve_for_df(double target_df, double min_log_lam = -12.0, double max_log_lam = 12.0);

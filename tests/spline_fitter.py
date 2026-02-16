@@ -6,7 +6,7 @@ from scipy.sparse import linalg as splinalg
 from scipy.optimize import brentq
 
 @dataclass
-class SplineFitter:
+class SplineSmoother:
     """
     Pure Python implementation of the smoothing spline fitter.
     Moved to tests for comparison purposes.
@@ -99,7 +99,7 @@ class SplineFitter:
         lam_scaled_opt = 10 ** log_lam_scaled_opt
         return lam_scaled_opt * (self.x_scale_ ** 3)
 
-    def fit(self, y, sample_weight=None):
+    def smooth(self, y, sample_weight=None):
         """
         Fit the smoothing spline using pure Python.
         """
@@ -176,7 +176,7 @@ class SplineFitter:
         if self.df is not None:
             self.lamval = self._find_lamval_for_df(self.df)
         if hasattr(self, 'y'):
-            self.fit(self.y)
+            self.smooth(self.y)
 
     def predict(self, x):
         """
@@ -223,7 +223,7 @@ class SplineFitter:
         """
         GCV is not implemented in pure Python.
         """
-        raise NotImplementedError("GCV optimization requires the C++ extension (SplineFitterCpp).")
+        raise NotImplementedError("GCV optimization requires the C++ extension (SplineSmootherCpp).")
 
 def compute_edf_reinsch(x, lamval, weights=None):
     x = np.array(x, dtype=float)

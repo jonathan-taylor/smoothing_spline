@@ -15,7 +15,7 @@ Eigen::MatrixXd compute_natural_spline_basis(
 
 Eigen::MatrixXd compute_penalty_matrix(const Eigen::Ref<const Eigen::VectorXd>& knots);
 
-class NaturalSplineFitter {
+class NaturalSplineSmoother {
     Eigen::MatrixXd N_;
     Eigen::MatrixXd Omega_;
     Eigen::MatrixXd NTW_; 
@@ -23,9 +23,9 @@ class NaturalSplineFitter {
     Eigen::VectorXd knots_;
     Eigen::VectorXd alpha_;
 public:
-    NaturalSplineFitter(const Eigen::Ref<const Eigen::VectorXd>& x, const Eigen::Ref<const Eigen::VectorXd>& knots, py::object weights_obj);
+    NaturalSplineSmoother(const Eigen::Ref<const Eigen::VectorXd>& x, const Eigen::Ref<const Eigen::VectorXd>& knots, py::object weights_obj);
     void update_weights(py::object weights_obj);
-    Eigen::VectorXd fit(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval);
+    Eigen::VectorXd smooth(const Eigen::Ref<const Eigen::VectorXd>& y, double lamval);
     Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv=0);
     double compute_df(double lamval);
     double gcv_score(double lamval, const Eigen::Ref<const Eigen::VectorXd>& y);

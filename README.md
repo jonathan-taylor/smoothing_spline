@@ -5,11 +5,11 @@ This repository provides a minimal, high-performance implementation of a smoothi
 ## Key Features
 
 *   **High Performance:** Core computations are in C++, leveraging the Eigen library for efficient linear algebra.
-*   **Scikit-learn Style API:** The `SplineFitter` class follows the familiar `fit`/`predict` paradigm.
 *   **Flexible Smoothing Control:** Specify smoothness by either degrees of freedom (`df`) or a penalty term (`lambda`).
 *   **Automatic GCV:** Includes a method to find the optimal smoothing parameter via Generalized Cross-Validation (GCV).
 *   **Extrapolation:** Supports linear extrapolation for points outside the training data range.
 *   **R Compatibility:** Tested against R's `smooth.spline` for comparable results.
+*   **Scikit-learn Style API (NOT):** The `SplineSmoother` class uses `smooth(y)`/`predict(x)`. It is not an sklearn estimator, but will be / is wrapped into one in `ISLP`. This is intentional, as there are use cases for this as a lower level object where weights may be updated and the smoother be refit to new data.
 
 ## Installation
 
@@ -26,7 +26,7 @@ Here is a simple example of how to fit a smoothing spline to noisy data.
 ```python
 import numpy as np
 import matplotlib.pyplot as plt
-from smoothing_spline.fitter import SplineFitter
+from smoothing_spline.fitter import SplineSmoother
 
 # 1. Generate some noisy data
 rng = np.random.default_rng(0)
@@ -36,8 +36,8 @@ y_noisy = y_true + rng.standard_normal(100) * 0.2
 
 # 2. Fit the smoothing spline
 # Specify the desired degrees of freedom (df)
-fitter = SplineFitter(x, df=8)
-fitter.fit(y_noisy)
+fitter = SplineSmoother(x, df=8)
+fitter.smooth(y_noisy)
 
 # 3. Predict on a new set of points
 x_pred = np.linspace(0, 1, 200)

@@ -14,7 +14,7 @@ kernelspec:
 
 # Performance Comparison: Pure Python vs C++ Extension
 
-This document compares the computational performance of the pure Python implementation (`SplineFitterPy`) and the C++ optimized implementation (`SplineFitter`) of the smoothing spline fitter.
+This document compares the computational performance of the pure Python implementation (`SplineSmootherPy`) and the C++ optimized implementation (`SplineSmoother`) of the smoothing spline fitter.
 
 ## Setup
 
@@ -28,12 +28,12 @@ import os
 # Ensure we can import from tests
 sys.path.append(os.path.abspath('..'))
 
-from smoothing_spline.fitter import SplineFitter
+from smoothing_spline.fitter import SplineSmoother
 try:
-    from tests.spline_fitter import SplineFitter as SplineFitterPy
+    from tests.spline_fitter import SplineSmoother as SplineSmootherPy
 except ImportError:
-    print("Could not import pure Python SplineFitter from tests.")
-    SplineFitterPy = None
+    print("Could not import pure Python SplineSmoother from tests.")
+    SplineSmootherPy = None
 ```
 
 ## Speed Comparison at Different Scales
@@ -52,15 +52,15 @@ def benchmark_fitters(ns, n_knots=None, engine='reinsch', python=True):
         # Pure Python (always basis form natural spline)
         if python:
             start = time.time()
-            fitter_py = SplineFitterPy(x, n_knots=n_knots, df=10)
-            fitter_py.fit(y)
+            fitter_py = SplineSmootherPy(x, n_knots=n_knots, df=10)
+            fitter_py.smooth(y)
             results['py'].append(time.time() - start)
 
         try:
             start = time.time()
             # Explicitly request engine
-            fitter_cpp = SplineFitter(x, df=10, n_knots=n_knots, engine=engine)
-            fitter_cpp.fit(y)
+            fitter_cpp = SplineSmoother(x, df=10, n_knots=n_knots, engine=engine)
+            fitter_cpp.smooth(y)
             results['cpp'].append(time.time() - start)
         except ValueError:
             # Engine might not be compatible (e.g. reinsch with reduced knots)
@@ -92,7 +92,7 @@ results_bspline = benchmark_fitters(ns, engine='bspline', python=False)['cpp']
 results_auto = benchmark_fitters(ns, engine='auto', python=False)['cpp']
 
 fig, ax = plt.subplots(figsize=(10, 6))
-if SplineFitterPy:
+if SplineSmootherPy:
     ax.plot(ns, results_py, 'o-', label='Pure Python')
 ax.plot(ns, results_natural, 's-', label="C++ 'natural'")
 ax.plot(ns, results_reinsch, '^-', label="C++ 'reinsch'")
@@ -148,7 +148,7 @@ y = np.sin(x) + rng.normal(0, 0.1, n)
 
 ```{code-cell} ipython3
 %%timeit
-fitter = SplineFitter(x, n_knots=K)
+fitter = SplineSmoother(x, n_knots=K)
 best_lam = fitter.solve_gcv(y)
 ```
 
