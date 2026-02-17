@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from scatter_smooth.fitter import SplineSmoother
-from scatter_smooth._spline_extension import CubicSplineTraceCpp, ReinschSmoother
+from scatter_smooth._scatter_smooth_extension import CubicSplineTraceCpp, ReinschSmoother
 
 @pytest.mark.parametrize("lam", np.logspace(-10, 2, 10))
 def test_unweighted_trace_cpp_agreement(lam):
@@ -26,7 +26,7 @@ def test_unweighted_trace_cpp_agreement(lam):
     # 2. Basis form DF calculation
     fitter_all_knots._use_reinsch = False
     fitter_all_knots._cpp_fitter = None # Force re-initialization
-    from scatter_smooth._spline_extension import NaturalSplineSmoother
+    from scatter_smooth._scatter_smooth_extension import NaturalSplineSmoother
     fitter_all_knots._setup_scaling_and_knots()
     x_scaled = fitter_all_knots.x_scaled_
     knots_scaled = fitter_all_knots.knots_scaled_

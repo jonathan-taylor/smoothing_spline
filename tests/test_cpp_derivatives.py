@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.interpolate import CubicSpline
 
-from scatter_smooth._spline_extension import compute_natural_spline_basis
+from scatter_smooth._scatter_smooth_extension import compute_natural_spline_basis
 
 def test_cpp_basis_derivatives():
     rng = np.random.default_rng(300)

@@ -5,7 +5,7 @@ from scipy.linalg import (cholesky_banded,
                           solveh_banded)
 from scipy.optimize import brentq
 
-from ._spline_extension import (
+from ._scatter_smooth_extension import (
     NaturalSplineSmoother, 
     ReinschSmoother, 
     BSplineSmoother,

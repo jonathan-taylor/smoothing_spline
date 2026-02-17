@@ -12,7 +12,7 @@ try:
 except ImportError:
     R_ENABLED = False
 
-from scatter_smooth._spline_extension import NaturalSplineSmoother as ExtSplineSmootherCpp
+from scatter_smooth._scatter_smooth_extension import NaturalSplineSmoother as ExtSplineSmootherCpp
 
 # Create a fixture to parametrize tests over both implementations
 @pytest.fixture()

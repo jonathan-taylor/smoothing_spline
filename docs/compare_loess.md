@@ -111,7 +111,8 @@ We can also fit a local quadratic model (`degree=2`).
 
 ```{code-cell} ipython3
 # Python
-loess_py_deg2 = LoessSmoother(x=x_sub, span=0.75, degree=2)
+degree = 2
+loess_py_deg2 = LoessSmoother(x=x_sub, span=0.75, degree=degree)
 loess_py_deg2.smooth(y_sub)
 y_py_deg2 = loess_py_deg2.predict(x_plot)
 
@@ -119,18 +120,18 @@ y_py_deg2 = loess_py_deg2.predict(x_plot)
 ```
 
 ```{code-cell} ipython3
-%%R -i x_sub -i y_sub -i x_plot -o y_r_deg2
-fit_r_deg2 <- loess(y_sub ~ x_sub, span=0.75, degree=2, family="gaussian", surface="direct")
+%%R -i x_sub -i y_sub -i x_plot -o y_r_deg2 -i degree
+fit_r_deg2 <- loess(y_sub ~ x_sub, span=0.75, degree=degree, family="gaussian", surface="direct")
 y_r_deg2 <- predict(fit_r_deg2, newdata=x_plot)
 ```
 
 ```{code-cell} ipython3
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.scatter(x_sub, y_sub, s=10, c='lightgray', alpha=0.7)
-ax.plot(x_plot, y_py_deg2, 'b-', lw=3, label='Python (degree=2)')
-ax.plot(x_plot, y_r_deg2, 'r--', lw=3, label='R (degree=2)')
+ax.plot(x_plot, y_py_deg2, 'b-', lw=3, label=f'Python (degree={degree})')
+ax.plot(x_plot, y_r_deg2, 'r--', lw=3, label=f'R (degree={degree})')
 ax.legend()
-plt.title("Comparison of Loess (degree=2)")
+plt.title(f"Comparison of Loess (degree={degree})")
 plt.show()
 
 valid = ~np.isnan(y_py_deg2) & ~np.isnan(y_r_deg2)
@@ -140,13 +141,13 @@ print(f"Mean Absolute Difference (Degree 2): {diff:.6f}")
 
 ## Speed Comparison
 
-We compare the execution time for fitting and predicting with the Loess model. Note that the current Python implementation is naive and purely in Python, so it is expected to be slower than R's optimized C/Fortran implementation, especially when `surface="interpolate"` (default) is used in R. Here we compare against `surface="direct"` in R which is also exact calculation.
+We compare the execution time for fitting and predicting with the Loess model. The `scatter_smooth` implementation uses an optimized C++ backend. We compare it against R's `loess` with `surface="direct"` (exact calculation).
 
 ```{code-cell} ipython3
-# Python Timing
-print(f"Python Timing (n={n_samples}):")
-# Note: fitting is lazy/storage-only in our python implementation, predict does the work
-%timeit -n 5 -r 3 LoessSmoother(x=x_sub, span=0.75, degree=1).smooth(y_sub); loess_py.predict(x_plot)
+%%timeit
+loess_py = LoessSmoother(x=x_sub, span=0.75, degree=1)
+loess_py.smooth(y_sub); 
+loess_py.predict(x_plot)
 ```
 
 ```{code-cell} ipython3
@@ -163,4 +164,108 @@ summary(microbenchmark(
       predict(fit, newdata=x_plot)
   },
   times=10), unit='milliseconds')[,-1]
+```
+
+## Larger Scale Comparison (N=5000)
+
+We increase the sample size to 5000 to see the performance difference more clearly.
+
+```{code-cell} ipython3
+n_large = 10000
+x_large = np.sort(np.random.uniform(0, 10, n_large))
+y_large = np.sin(x_large) + np.random.normal(0, 1, n_large)
+x_plot_large = np.linspace(0, 10, 200)
+```
+
+The implementation here doesn't compute fitted values at 
+the original `x` unless needed.
+
+```{code-cell} ipython3
+%%timeit 
+loess_cpp_large = LoessSmoother(x_large, span=0.75, degree=1)
+loess_cpp_large.smooth(y_large)
+loess_cpp_large.predict(x_plot_large)
+```
+
+If we include the cost of predicting at all of `x_large` we see the
+price:
+
+```{code-cell} ipython3
+%%timeit 
+loess_cpp_large = LoessSmoother(x_large, span=0.75, degree=1)
+loess_cpp_large.smooth(y_large)
+loess_cpp_large.predict(x_plot_large)
+loess_cpp_large.predict(x_large)
+```
+
+```{code-cell} ipython3
+%%R -i n_large -i y_large -i x_large -i x_plot_large
+
+cat(sprintf("\nR Timing (N=%d):\n", n_large))
+summary(microbenchmark(
+  {
+      fit <- loess(y_large ~ x_large, span=0.75, degree=1, family="gaussian", surface="direct")
+      predict(fit, newdata=x_plot_large)
+  },
+  times=5), unit='milliseconds')[,-1]
+```
+
+## Let's try quadratic as well
+
+```{code-cell} ipython3
+%%timeit 
+loess_cpp_large = LoessSmoother(x_large, span=0.75, degree=2)
+loess_cpp_large.smooth(y_large)
+loess_cpp_large.predict(x_plot_large)
+```
+
+Including all the values is noticably slower
+
+```{code-cell} ipython3
+%%timeit 
+loess_cpp_large = LoessSmoother(x_large, span=0.5, degree=2)
+loess_cpp_large.smooth(y_large)
+loess_cpp_large.predict(x_plot_large)
+loess_cpp_large.predict(x_large)
+```
+
+```{code-cell} ipython3
+loess_cpp_large = LoessSmoother(x_large, span=0.5, degree=2)
+loess_cpp_large.smooth(y_large)
+y_plot_py = loess_cpp_large.predict(x_plot_large)
+```
+
+```{code-cell} ipython3
+%%R -o y_plot_r -i degree
+
+fit <- loess(y_large ~ x_large, span=0.5, degree=2, family="gaussian", surface="direct")
+y_plot_r <- predict(fit, newdata=x_plot_large)
+summary(microbenchmark(
+  {
+      fit <- loess(y_large ~ x_large, 
+                   span=0.75, 
+                   degree=2, 
+                   family="gaussian", 
+                   surface="direct")
+      predict(fit, newdata=x_plot_large)
+  },
+  times=5), unit='seconds')[,-1]
+```
+
+```{code-cell} ipython3
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.scatter(x_large, y_large, s=10, c='lightgray', alpha=0.7)
+ax.plot(x_plot_large, y_plot_py, 'b-', lw=3, label=f'Python (degree=2)')
+ax.plot(x_plot_large, y_plot_r, 'r--', lw=3, label=f'R (degree=2)')
+ax.legend()
+plt.title(f"Comparison of Loess (degree={degree})")
+plt.show()
+
+valid = ~np.isnan(y_plot_py) & ~np.isnan(y_plot_r)
+diff = np.mean(np.abs(y_plot_py[valid] - y_plot_r[valid]))
+print(f"Mean Absolute Difference (Degree 2): {diff:.6f}")
+```
+
+```{code-cell} ipython3
+
 ```

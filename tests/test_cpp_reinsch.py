@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scatter_smooth.fitter import SplineSmoother
 
-from scatter_smooth._spline_extension import ReinschSmoother
+from scatter_smooth._scatter_smooth_extension import ReinschSmoother
 
 def test_reinsch_fitter_exact_fit():
     rng = np.random.default_rng(200)

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from scatter_smooth._spline_extension import ReinschSmoother
+from scatter_smooth._scatter_smooth_extension import ReinschSmoother
 from .weighted_spline_trace import WeightedCubicSplineTrace, naive_weighted_trace
 
 @pytest.mark.parametrize("lam", np.logspace(-10, 2, 5))
