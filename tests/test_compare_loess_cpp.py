@@ -1,6 +1,6 @@
 import numpy as np
 from .loess import LoessSmoother as LoessSmootherPy
-from scatter_smooth.loess import LoessSmoother as LoessSmootherCpp
+from scatter_smooth import LoessSmoother 
 
 def test_compare_cpp_python_loess():
     rng = np.random.default_rng(42)
@@ -16,7 +16,7 @@ def test_compare_cpp_python_loess():
     loess_py.smooth(y)
     
     # C++
-    loess_cpp = LoessSmootherCpp(x=x, span=span, degree=degree)
+    loess_cpp = LoessSmoother(x=x, span=span, degree=degree)
     loess_cpp.smooth(y)
     
     x_new = np.linspace(0, 10, 50)

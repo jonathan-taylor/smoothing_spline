@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from scipy.interpolate import BSpline
-from scatter_smooth.fitter import SplineSmoother
+from scatter_smooth import SplineSmoother
 
 def compute_ref_matrices(x, knots, order=4, weights=None):
     if weights is None:

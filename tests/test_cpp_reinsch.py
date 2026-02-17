@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from scatter_smooth.fitter import SplineSmoother
+from scatter_smooth import SplineSmoother
 
 from scatter_smooth._scatter_smooth_extension import ReinschSmoother
 

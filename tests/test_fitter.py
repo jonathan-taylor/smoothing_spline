@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from scatter_smooth.fitter import SplineSmoother
+from scatter_smooth import SplineSmoother
 from tests.spline_fitter import SplineSmoother as SplineSmootherPy, compute_edf_reinsch
 
 # Setup for R comparison

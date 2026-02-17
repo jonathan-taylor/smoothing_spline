@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from scatter_smooth.fitter import SplineSmoother
+from scatter_smooth import SplineSmoother
 
 @pytest.mark.parametrize("n_samples", [50, 100])
 @pytest.mark.parametrize("weighted", [False, True])

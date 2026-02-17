@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from scatter_smooth.fitter import SplineSmoother
+from scatter_smooth import SplineSmoother
 
 @pytest.mark.xfail(reason="Derivative calculation is not accurate enough at the boundaries.")
 def test_derivatives():
