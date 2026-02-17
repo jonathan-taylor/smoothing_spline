@@ -1,5 +1,5 @@
 project('scatter_smooth', 'cpp',
-  version : run_command('get-version.py', check: true).stdout().strip(),
+  version : run_command('get_version.py', check: true).stdout().strip(),
   default_options : ['warning_level=3', 'cpp_std=c++14'])
 
 py = import('python').find_installation(pure: false)
