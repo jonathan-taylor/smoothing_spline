@@ -16,6 +16,7 @@ project:
     - file: compare_R.md
     - file: compare_cpp.md
     - file: compare_scipy.md
+    - file: compare_loess.md
 site:
   options:
     folders: true
