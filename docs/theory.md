@@ -12,7 +12,7 @@ jupytext:
 
 # Smoothing Splines: Theory and Implementation
 
-This document outlines the theoretical background for the `smoothing_spline` package, synthesizing concepts from *The Elements of Statistical Learning* (Hastie, Tibshirani, Friedman), specifically Chapter 5. It also discusses the implementation details (Reinsch form vs. Basis form) and compares the features with R's `smooth.spline`.
+This document outlines the theoretical background for the `scatter_smooth` package, synthesizing concepts from *The Elements of Statistical Learning* (Hastie, Tibshirani, Friedman), specifically Chapter 5. It also discusses the implementation details (Reinsch form vs. Basis form) and compares the features with R's `smooth.spline`.
 
 ## 1. The Smoothing Spline Problem
 
@@ -178,7 +178,7 @@ Our `bspline` engine implements this by:
 
 ## 4. Comparison with R's `smooth.spline`
 
-| Feature | `smooth.spline` (R) | `smoothing_spline` (Python) |
+| Feature | `smooth.spline` (R) | `scatter_smooth` (Python) |
 | :--- | :--- | :--- |
 | **Algorithm** | Reinsch Form ($O(N)$) | `engine='auto'` (selects best), `engine='reinsch'` ($O(N)$), `engine='natural'` ($O(NK^2)$), `engine='bspline'` (Banded) |
 | **Knots** | All unique $x$ (default) or $nknots$ | All unique $x$ or specified `n_knots` |

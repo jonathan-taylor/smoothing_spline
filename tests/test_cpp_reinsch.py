@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-from smoothing_spline.fitter import SplineSmoother
+from scatter_smooth.fitter import SplineSmoother
 
-from smoothing_spline._spline_extension import ReinschSmoother
+from scatter_smooth._spline_extension import ReinschSmoother
 
 def test_reinsch_fitter_exact_fit():
     rng = np.random.default_rng(200)

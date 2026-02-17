@@ -1,6 +1,6 @@
 # import numpy as np
 # import pytest
-# from smoothing_spline.lowess import LowessSmoother, LowessSmootherNaive
+# from scatter_smooth.lowess import LowessSmoother, LowessSmootherNaive
 
 # def test_lowess_consistency():
 #     """

@@ -3,7 +3,7 @@ import pytest
 from scipy import sparse
 from scipy.sparse import linalg as splinalg
 
-from smoothing_spline._spline_extension import compute_penalty_matrix
+from scatter_smooth._spline_extension import compute_penalty_matrix
 
 def test_cpp_penalty_matches_scipy():
     rng = np.random.default_rng(55)

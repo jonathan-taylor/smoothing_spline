@@ -28,7 +28,7 @@ import os
 # Ensure we can import from tests
 sys.path.append(os.path.abspath('..'))
 
-from smoothing_spline.fitter import SplineSmoother
+from scatter_smooth.fitter import SplineSmoother
 try:
     from tests.spline_fitter import SplineSmoother as SplineSmootherPy
 except ImportError:
