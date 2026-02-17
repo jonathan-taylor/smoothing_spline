@@ -12,11 +12,11 @@ kernelspec:
   name: python3
 ---
 
-# Boundary Behavior Comparison: `smoothing_spline` vs `scipy`
+# Boundary Behavior Comparison: `scatter_smooth` vs `scipy`
 
-This document illustrates the differences in boundary behavior and extrapolation between `smoothing_spline.SplineSmoother` and `scipy.interpolate.make_smoothing_spline`.
+This document illustrates the differences in boundary behavior and extrapolation between `scatter_smooth.SplineSmoother` and `scipy.interpolate.make_smoothing_spline`.
 
-While both methods fit smoothing splines, `smoothing_spline` explicitly implements **natural cubic splines**, which implies that the function should be linear beyond the boundary knots (i.e., the second derivative is zero at the boundaries).
+While both methods fit smoothing splines, `scatter_smooth` explicitly implements **natural cubic splines**, which implies that the function should be linear beyond the boundary knots (i.e., the second derivative is zero at the boundaries).
 
 We will demonstrate this by fitting both models to a dataset and observing their predictions outside the range of the training data.
 
@@ -26,7 +26,7 @@ We will demonstrate this by fitting both models to a dataset and observing their
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import make_smoothing_spline
-from smoothing_spline import SplineSmoother
+from scatter_smooth import SplineSmoother
 
 # Generate synthetic data
 rng = np.random.default_rng(42)
@@ -46,9 +46,9 @@ We will fit both models using a similar regularization strength. Note that the p
 For simplicity, let's fix a lambda value that provides a reasonable smooth fit.
 
 ```{code-cell} ipython3
-# Fit smoothing_spline
+# Fit scatter_smooth
 # We explicitly ask for a specific lambda or let GCV find one.
-# Let's use GCV for smoothing_spline to get a good fit first.
+# Let's use GCV for scatter_smooth to get a good fit first.
 fitter = SplineSmoother(x, n_knots=25)
 lam_best = fitter.solve_gcv(y)
 y_ours = fitter.predict(x_plot)
@@ -76,8 +76,8 @@ fig, ax = plt.subplots(figsize=(10, 6))
 # Plot Data
 ax.scatter(x, y, color='black', label='Data', zorder=5)
 
-# Plot smoothing_spline result
-ax.plot(x_plot, y_ours, 'b-', linewidth=2, label='smoothing_spline (Natural)')
+# Plot scatter_smooth result
+ax.plot(x_plot, y_ours, 'b-', linewidth=2, label='scatter_smooth (Natural)')
 
 # Plot scipy result
 ax.plot(x_plot, y_scipy, 'r--', linewidth=2, label='scipy.interpolate.make_smoothing_spline')
@@ -96,8 +96,8 @@ ax.set_ylim([-10,10])
 
 As seen in the plot:
 
-1.  **`smoothing_spline`**: The blue line becomes perfectly **linear** outside the vertical dashed lines (the data boundaries). This is the defining property of a **natural cubic spline**. The second derivative is zero at the boundary knots, and this zero curvature is maintained during extrapolation.
+1.  **`scatter_smooth`**: The blue line becomes perfectly **linear** outside the vertical dashed lines (the data boundaries). This is the defining property of a **natural cubic spline**. The second derivative is zero at the boundary knots, and this zero curvature is maintained during extrapolation.
 
 2.  **`scipy.interpolate.make_smoothing_spline`**: The red dashed line usually exhibits **cubic** extrapolation (it curves away). While `make_smoothing_spline` solves the smoothing spline objective, the returned B-spline object often extrapolates based on the polynomial form of the end segments, which is not necessarily constrained to be linear unless specific boundary knots or coefficients are enforced. In many statistical contexts, the "natural" boundary condition (linear extrapolation) is preferred to avoid wild oscillations outside the data range.
 
-This highlights a key feature of the `smoothing_spline` package: it guarantees safe, linear extrapolation by design.
+This highlights a key feature of the `scatter_smooth` package: it guarantees safe, linear extrapolation by design.

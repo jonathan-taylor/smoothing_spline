@@ -24,7 +24,9 @@ dev = [
     "pytest",
     "scipy",
     "ninja",
-    "meson"
+    "meson",
+    "meson-python",
+    "pybind11"
 ]
 doc = [
     "myst-parser",

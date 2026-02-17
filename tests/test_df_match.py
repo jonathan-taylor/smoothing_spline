@@ -1,5 +1,5 @@
 import numpy as np
-from smoothing_spline.fitter import SplineSmoother
+from scatter_smooth.fitter import SplineSmoother
 
 def test_bspline_df_takahashi():
     np.random.seed(42)

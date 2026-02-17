@@ -3,7 +3,7 @@ import pytest
 from scipy.linalg import cholesky_banded, inv
 from .takahashi_trace import (takahashi_upper,
                               trace_product_banded)
-from smoothing_spline._spline_extension import trace_takahashi as trace_takahashi_cpp
+from scatter_smooth._spline_extension import trace_takahashi as trace_takahashi_cpp
 
 def band_to_dense(ab, w, N):
     """Helper to expand banded storage to dense matrix for verification."""

@@ -26,7 +26,7 @@ Here is a simple example of how to fit a smoothing spline to noisy data.
 ```python
 import numpy as np
 import matplotlib.pyplot as plt
-from smoothing_spline.fitter import SplineSmoother
+from scatter_smooth.fitter import SplineSmoother
 
 # 1. Generate some noisy data
 rng = np.random.default_rng(0)
@@ -61,8 +61,8 @@ To build the package from source, you will need a C++ compiler compatible with C
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/your-username/smoothing_spline.git
-    cd smoothing_spline
+    git clone https://github.com/your-username/scatter_smooth.git
+    cd scatter_smooth
     ```
 
 2.  Install the dependencies and build the extension:

@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from smoothing_spline.fitter import SplineSmoother
+from scatter_smooth.fitter import SplineSmoother
 from tests.spline_fitter import SplineSmoother as SplineSmootherPy, compute_edf_reinsch
 
 # Setup for R comparison
@@ -12,14 +12,14 @@ try:
 except ImportError:
     R_ENABLED = False
 
-from smoothing_spline._spline_extension import NaturalSplineSmoother as ExtSplineSmootherCpp
+from scatter_smooth._spline_extension import NaturalSplineSmoother as ExtSplineSmootherCpp
 
 # Create a fixture to parametrize tests over both implementations
 @pytest.fixture()
 def fitter_cls(request):
     return SplineSmoother
 
-def test_smoothing_spline_lamval(fitter_cls):
+def test_scatter_smooth_lamval(fitter_cls):
     rng = np.random.default_rng(0)
     x = np.linspace(0, 1, 100)
     y = np.sin(2 * np.pi * x) + rng.standard_normal(100) * 0.1
@@ -30,7 +30,7 @@ def test_smoothing_spline_lamval(fitter_cls):
     
     assert y_pred.shape == x.shape
 
-def test_smoothing_spline_df(fitter_cls):
+def test_scatter_smooth_df(fitter_cls):
     rng = np.random.default_rng(1)
     x = np.linspace(0, 1, 100)
     y = np.sin(2 * np.pi * x) + rng.standard_normal(100) * 0.1

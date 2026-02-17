@@ -12,9 +12,9 @@ kernelspec:
   name: python3
 ---
 
-# Comparing `smoothing_spline` with R's `smooth.spline`
+# Comparing `scatter_smooth` with R's `smooth.spline`
 
-This document demonstrates the usage of the `smoothing_spline` package and compares it with the standard `smooth.spline` function in R. We will use the `Bikeshare` dataset from the `ISLP` package.
+This document demonstrates the usage of the `scatter_smooth` package and compares it with the standard `smooth.spline` function in R. We will use the `Bikeshare` dataset from the `ISLP` package.
 
 ## Setup
 
@@ -25,8 +25,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
-from smoothing_spline.datasets import load_bikeshare
-from smoothing_spline import SplineSmoother
+from scatter_smooth.datasets import load_bikeshare
+from scatter_smooth import SplineSmoother
 
 %load_ext rpy2.ipython
 ```
@@ -58,7 +58,7 @@ x_plot = hr_numeric.iloc[sorted_idx].unique()
 
 ## Fitting Smoothing Splines
 
-### 1. Using `smoothing_spline` (Python)
+### 1. Using `scatter_smooth` (Python)
 
 We fit a smoothing spline with a specified degrees of freedom ($df=5$).
 
@@ -95,7 +95,7 @@ Let's visualize the results. They should be nearly identical.
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.scatter(hr_numeric + np.random.normal(0, 0.1, len(hr_numeric)), bikers, 
             s=1, c='lightgray', alpha=0.5, label='Data')
-ax.plot(x_plot, y_py, 'b-', lw=3, label='Python (smoothing_spline)', alpha=0.8)
+ax.plot(x_plot, y_py, 'b-', lw=3, label='Python (scatter_smooth)', alpha=0.8)
 ax.plot(x_plot, y_r, 'r--', lw=3, label='R (smooth.spline)', alpha=0.8)
 ax.set_xlabel("Hour")
 ax.set_ylabel("Number of Bikers")
@@ -105,7 +105,7 @@ plt.show()
 
 # Numerical comparison
 # Note: R might handle repeated x values slightly differently (using weights)
-# smoothing_spline handles them naturally in the basis construction.
+# scatter_smooth handles them naturally in the basis construction.
 diff = np.mean(np.abs(y_py - y_r))
 print(f"Mean Absolute Difference: {diff:.6f}")
 ```
@@ -150,9 +150,9 @@ cat("Selected lambda (R):", fit_gcv$lambda, "
 ")
 ```
 
-### In Python (smoothing_spline)
+### In Python (scatter_smooth)
 
-The `smoothing_spline` package also supports finding $\lambda$ that minimizes the GCV score via the `solve_gcv` method.
+The `scatter_smooth` package also supports finding $\lambda$ that minimizes the GCV score via the `solve_gcv` method.
 
 ```{code-cell} ipython3
 # Initialize fitter with data
@@ -209,7 +209,7 @@ plt.show()
 
 ## Synthetic Data Comparison (Reinsch Engine / All Knots)
 
-Finally, we compare the speed of both implementations on a synthetic dataset with 500 unique $x$ values. Since we use all unique $x$ values as knots, `smoothing_spline` automatically selects the efficient Reinsch engine.
+Finally, we compare the speed of both implementations on a synthetic dataset with 500 unique $x$ values. Since we use all unique $x$ values as knots, `scatter_smooth` automatically selects the efficient Reinsch engine.
 
 ```{code-cell} ipython3
 # Synthetic data
@@ -249,7 +249,7 @@ summary(microbenchmark(
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.scatter(x_syn, y_syn, 
             s=15, c='lightgray', alpha=0.7, label='Data')
-ax.plot(x_plot, y_plot_py, 'b-', lw=3, label='Python (smoothing_spline)', alpha=0.8)
+ax.plot(x_plot, y_plot_py, 'b-', lw=3, label='Python (scatter_smooth)', alpha=0.8)
 ax.plot(x_plot, y_plot_R, 'r--', lw=3, label='R (smooth.spline)', alpha=0.8)
 ax.set_xlabel("x")
 ax.set_ylabel("y")
@@ -304,7 +304,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 plot_idx = np.random.choice(len(x_syn), size=min(len(x_syn), 1000), replace=False)
 ax.scatter(x_syn[plot_idx], y_syn[plot_idx], 
             s=5, c='lightgray', alpha=0.5, label='Data (Subsampled)')
-ax.plot(x_plot, y_plot_py, 'b-', lw=3, label='Python (smoothing_spline)', alpha=0.8)
+ax.plot(x_plot, y_plot_py, 'b-', lw=3, label='Python (scatter_smooth)', alpha=0.8)
 ax.plot(x_plot, y_plot_R, 'r--', lw=3, label='R (smooth.spline)', alpha=0.8)
 ax.set_xlabel("x")
 ax.set_ylabel("y")
@@ -315,4 +315,4 @@ plt.show()
 
 ## Performance Note
 
-The `smoothing_spline` package implements efficient $O(N)$ trace calculation using Takahashi's equations for the `bspline` engine, matching the algorithmic complexity of R's `smooth.spline` for degrees of freedom calculation, which is the costliest part as it involves a Cholesky factorization for each candidate `lamval`.
+The `scatter_smooth` package implements efficient $O(N)$ trace calculation using Takahashi's equations for the `bspline` engine, matching the algorithmic complexity of R's `smooth.spline` for degrees of freedom calculation, which is the costliest part as it involves a Cholesky factorization for each candidate `lamval`.
