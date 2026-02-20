@@ -2,6 +2,23 @@
 
 This repository provides minimal, high-performance implementations of key scatterplot smoothers, specifically **Smoothing Splines** and **LOESS**. The core logic is implemented in C++ for speed, with convenient Python bindings provided by `pybind11`. The package is designed to be familiar to users of `scikit-learn` and R's statistical functions.
 
+## Why this repo?
+
+- Seems there should be a good performant operation like a smoothing spline accessible
+with just `scipy`, `numpy`
+
+- A reason to try vibe-coding:
+    - Initial code written in a Gemini chat
+    - Ported to C++ with help from Gemini CLI
+
+- Ultimately, human intervention pointed out what would really make it work (using Takahashi algorithm not just for Reinsch form but also B-splines via Tr(A^{-1}B) for banded matrices of the same bandwidth.
+
+- References that Gemini cited:
+    - Reinsch, C. H. (1967). Smoothing by spline functions. Numerische Mathematik, 10(3), 177-183.
+    - Green, P. J., & Silverman, B. W. (1994). Nonparametric Regression and Generalized Linear Models: A roughness penalty approach. Chapman & Hall/CRC.
+    - Wahba, G. (1990). Spline Models for Observational Data. SIAM.
+    - Hastie, Tibshirani, & Friedman (2009). The Elements of Statistical Learning. (Section 5.4)
+
 ## Key Smoothers
 
 *   **Smoothing Splines:** A flexible implementation similar to R's `smooth.spline`. It supports multiple fitting engines, including the Reinsch algorithm for $O(N)$ performance, as well as B-spline and natural spline bases.
