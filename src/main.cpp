@@ -16,7 +16,7 @@ PYBIND11_MODULE(_scatter_smooth_extension, m) {
     py::class_<LoessSmootherCpp>(m, "LoessSmootherCpp")
         .def(py::init<const Eigen::Ref<const Eigen::VectorXd>&, py::object, double, int>(),
              py::arg("x"), py::arg("weights_obj") = py::none(), py::arg("span") = 0.75, py::arg("degree") = 1)
-        .def("fit", &LoessSmootherCpp::fit)
+        .def("set_y", &LoessSmootherCpp::set_y)
         .def("update_weights", &LoessSmootherCpp::update_weights)
         .def("predict", &LoessSmootherCpp::predict, py::arg("x_new"), py::arg("deriv") = 0);
 

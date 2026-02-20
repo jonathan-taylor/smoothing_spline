@@ -17,7 +17,7 @@ LoessSmootherCpp::LoessSmootherCpp(const Eigen::Ref<const Eigen::VectorXd>& x,
     }
 }
 
-void LoessSmootherCpp::fit(const Eigen::Ref<const Eigen::VectorXd>& y) {
+void LoessSmootherCpp::set_y(const Eigen::Ref<const Eigen::VectorXd>& y) {
     y_ = y;
 }
 

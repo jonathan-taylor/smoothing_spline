@@ -14,7 +14,7 @@ public:
                      double span, 
                      int degree);
 
-    void fit(const Eigen::Ref<const Eigen::VectorXd>& y);
+    void set_y(const Eigen::Ref<const Eigen::VectorXd>& y);
     void update_weights(py::object weights_obj);
     
     Eigen::VectorXd predict(const Eigen::Ref<const Eigen::VectorXd>& x_new, int deriv = 0);
